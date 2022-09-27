@@ -1,0 +1,3 @@
+#!/bin/bash
+
+wp "$@" --url=${DDEV_PRIMARY_URL}

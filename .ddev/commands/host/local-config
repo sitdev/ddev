@@ -1,0 +1,15 @@
+#!/bin/bash
+
+cat <<EOT > ${DDEV_APPROOT}/${DDEV_DOCROOT}/local-config.php
+<?php
+const DB_NAME = 'db';
+const DB_USER = 'db';
+const DB_PASSWORD = 'db';
+const DB_HOST = 'db';
+const ENVIRONMENT = 'local';
+const WP_SITEURL = '${DDEV_PRIMARY_URL}/wp';
+const WP_HOME = '${DDEV_PRIMARY_URL}/';
+const WP_CONTENT_URL = '${DDEV_PRIMARY_URL}/wp-content';
+EOT
+
+

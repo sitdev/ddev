@@ -1,0 +1,20 @@
+#!/bin/bash
+
+if [ -z $1 ]; then 
+  wp wpsdb migrate --help --url=${DDEV_PRIMARY_URL}
+  ls .ddev/migrations | sed -e 's/\.json//' 
+  exit
+fi
+
+FILE=".ddev/migrations/${1}.json"
+
+if [ -f ${FILE} ]; then
+  echo "Importing Migration"
+  wp option update wpsdb_settings --url=${DDEV_PRIMARY_URL} --format=json < ${FILE}
+  echo "Running Migration..."
+  wp option get wpsdb_settings | grep name
+  wp wpsdb migrate 1 --url=${DDEV_PRIMARY_URL}
+else
+  echo "Migration ${1} not found."  
+  echo "Delete existing migrations, set up the new one, and run \"ddev export-migration\"."
+fi

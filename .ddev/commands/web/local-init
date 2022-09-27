@@ -1,0 +1,20 @@
+#!/bin/bash
+
+#which replace &> /dev/null || yarn global add replace
+
+read -p "sit-admin password: [test] " USER_PASS
+USER_PASS=${USER_PASS:-test}
+wp core install --url=${DDEV_PRIMARY_URL} --title="${SITE_TITLE}" --admin_user="sit-admin" --admin_email="developers@situationinteractive.com"
+wp user update sit-admin --user_pass=${USER_PASS}
+wp rewrite structure '/%postname%/'
+wp option update timezone_string "America/New_York"
+wp option delete blogdescription comments_notify default_comment_status default_ping_status default_pingback_flag comment_moderation moderation_notify comment_registration show_avatars close_comments_for_old_posts page_comments	
+wp post delete 1 --force
+wp post update 2 --post_content="" --post_title="Home" --post_name="home"
+wp option update show_on_front "page"
+wp option update page_on_front 2
+
+#read -p "Activate plugins? [yes/NO] " ACTIVATE_PLUGINS
+#ACTIVATE_PLUGINS=${ACTIVATE_PLUGINS:-no}
+wp plugin activate backstage classic-editor producers set-design soil vc-library js_composer wp-image wp-sync-db wp-sync-db-cli wp-sync-db-media-files --url=${DDEV_PRIMARY_URL}
+#wp plugin list --url=${DDEV_PRIMARY_URL}
