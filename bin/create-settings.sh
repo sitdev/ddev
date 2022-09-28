@@ -1,6 +1,6 @@
 #!/bin/bash
 
-data_folder=.ddev-data
+data_folder=.conf
 settings_file="${data_folder}/settings"
 if [ ! -f $settings_file ]; then
   mkdir -p $data_folder

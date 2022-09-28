@@ -6,7 +6,7 @@ if [ -z $1 ]; then
   exit
 fi
 
-FILE=".ddev/migrations/${1}.json"
+FILE=".conf/migrations/${1}.json"
 
 if [ -f ${FILE} ]; then
   echo "Importing Migration"
