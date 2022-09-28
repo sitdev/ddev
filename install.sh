@@ -1,7 +1,7 @@
 #!/bin/bash
 
+echo "${1}"
 branch=${1:-main}
-echo $1
 git clone -b ${branch} git@github.com:sitdev/ddev.git .ddev-setup
 pwd
 ls -al .ddev-setup
