@@ -29,3 +29,5 @@ export SITE_NAME="${SITE_NAME}"
 export SITE_TITLE="${SITE_TITLE}"
 export SITE_THEME="${SITE_THEME}"
 EOT
+
+source $settings_file

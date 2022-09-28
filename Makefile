@@ -1,26 +1,14 @@
 # Situation DDEV
 # Version: 0.0.1
-# System setup:
-#	brew install colima
-#	colima start --cpu 4 --memory 6 --disk 100 --dns=1.1.1.1
-#	# If your main projects folder isn't in your $HOME directory, use this
-#		(replace "/Volumes/dev" with your project parent location):
-#		colima start --cpu 4 --memory 6 --disk 100 --dns=1.1.1.1 --mount "/Volumes/dev:w" --mount "~:w"
-#	brew install drud/ddev/ddev
-#	brew install nss
-#	mkcert -install
-#	ddev config global --mutagen-enabled
 
 UPDATE_BRANCH="main"
 .PHONY: *
 
 init: start develop
 
-testing:
-	@[ -d .ddev ] || echo 'not exists'
-
 start:
 	@docker stats --no-stream &> /dev/null || colima start
+	@[ -d .ddev ] || make self-update
 	@ddev list | grep -v "$$(pwd)" | grep "running" &> /dev/null && ddev poweroff || continue 
 	@ddev list | grep "$$(pwd)" | grep "running" &> /dev/null || (ddev start && ddev auth ssh && make mutagen-sync)
 
@@ -89,7 +77,7 @@ reset-docker:
 factory-reset: clean reset-ddev reset-docker
 
 self-update:
-	@curl -s https://raw.githubusercontent.com/sitdev/ddev/main/install.sh | bash /dev/stdin ${UPDATE_BRANCH}
+	@/bin/bash -c "$$(curl -fsSL https://raw.githubusercontent.com/sitdev/ddev/main/install.sh)" -- "${UPDATE_BRANCH}"
 
 status:
 	@ddev status
