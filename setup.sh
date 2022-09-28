@@ -18,3 +18,4 @@ web_environment:
   - SITE_THEME=${SITE_THEME}
 EOT
 cp -r "${scriptRoot}/Makefile" ./
+git add -A .
