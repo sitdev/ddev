@@ -12,8 +12,15 @@ if [ -f ${FILE} ]; then
   echo "Importing Migration"
   wp option update wpsdb_settings --url=${DDEV_PRIMARY_URL} --format=json < ${FILE}
   echo "Running Migration..."
-  wp option get wpsdb_settings | grep name
+  migrationProfile=$(wp option get wpsdb_settings)
+  isPull=$(echo "${migrationProfile}" | grep action | grep pull)
+  migrationName=$(echo "${migrationProfile}" | grep name)
+  echo "${migrationName}"
   wp wpsdb migrate 1 --url=${DDEV_PRIMARY_URL}
+  if [ ! -z "${isPull}" ]; then
+    wp plugin deactivate wp-rocket --url=${DDEV_PRIMARY_URL}
+    wp plugin deactivate redis-cache --url=${DDEV_PRIMARY_URL}
+  fi
 else
   echo "Migration ${1} not found."  
   echo "Delete existing migrations, set up the new one, and run \"ddev export-migration\"."
