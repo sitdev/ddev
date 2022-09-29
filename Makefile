@@ -4,7 +4,7 @@
 UPDATE_BRANCH="main"
 .PHONY: *
 
-all: poweron develop ## Turn on ddev and run build
+all: start develop ## Turn on ddev and run build
 
 develop: running composer-develop yarn-develop mutagen-sync ## Run the development build
 
