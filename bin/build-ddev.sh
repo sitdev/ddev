@@ -17,3 +17,5 @@ hooks:
   - exec: nvm install ${NODE_VER}
 EOT
 fi
+
+[ -d .conf/.ddev ] && cp -RT .conf/.ddev/ .ddev/
