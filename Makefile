@@ -4,7 +4,10 @@
 UPDATE_BRANCH="main"
 .PHONY: *
 
-all: develop ## Turn on ddev and run build
+all: develop
+
+develop: start install build container-sync ## Turn on ddev and run build
+production: start install-production build-production container-sync ## Run the production build
 
 install: ## Install all dev dependencies
 	@ddev composer install --prefer-source
@@ -21,9 +24,6 @@ build: ## Run front-end dev build
 
 build-production: ## Run front-end production build
 	@ddev yarn-build production
-
-develop: start install build container-sync ## Turn on ddev and run build
-production: start install-production build-production container-sync ## Run the production build
 
 start: ## Turn on ddev
 	@docker stats --no-stream &> /dev/null || colima start
@@ -53,9 +53,9 @@ clean: ## Clean build
 	@find . -type d -name "node_modules" -prune -exec rm -rf {} \;
 	@find wp-content/themes -type d -name "bower_components" -prune -exec rm -rf {} \;
 	@find wp-content/themes -type d  -name "dist" -prune -exec rm -rf {} \;
-	@ddev mutagen sync &> /dev/null || continue
 
 reset-project: clean ## Clean build and git hard reset/pull
+	@mv wp-content/uploads ./ && rm -rf wp-content && mkdir -p wp-content && mv uploads wp-content/
 	@git add -A .
 	@git reset --hard
 	@git fetch

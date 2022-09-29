@@ -8,7 +8,7 @@ cat <<EOT > .ddev/config.local.yaml
 name: ${SITE_NAME}
 web_environment:
   - SITE_TITLE=${SITE_TITLE}
-  - SITE_THEME=${SITE_THEME}
+  - NODE_VER=${NODE_VER}
 EOT
 if [[ "${NODE_VER}" != "16" ]]; then
   cat <<EOT >> .ddev/config.local.yaml

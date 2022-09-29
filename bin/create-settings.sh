@@ -36,11 +36,6 @@ if [ -z "${SITE_TITLE}" ]; then
   SITE_TITLE=${SITE_TITLE:-$default_site_title}
 fi
 
-if [ -z "${SITE_THEME}" ]; then
-  read -p "Theme Folder: [$SITE_NAME] " SITE_THEME
-  SITE_THEME=${SITE_THEME:-$SITE_NAME}
-fi
-
 if [ -z "${NODE_VER}" ]; then
   node_guess=$(guess_node_ver)
   read -p "Node Version: [${node_guess}] " NODE_VER
@@ -51,7 +46,6 @@ cat <<EOT >$settings_file
 #!/bin/bash
 export SITE_NAME="${SITE_NAME}"
 export SITE_TITLE="${SITE_TITLE}"
-export SITE_THEME="${SITE_THEME}"
 export NODE_VER="${NODE_VER}"
 EOT
 
