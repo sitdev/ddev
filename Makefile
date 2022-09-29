@@ -81,6 +81,15 @@ factory-reset: clean reset-ddev reset-docker ## Full project clean and reset of 
 self-update: ## Update Situation ddev config from remote repository
 	@[ -z ${UPDATE_BRANCH} ] || /bin/bash -c "$$(curl -fsSL https://raw.githubusercontent.com/sitdev/ddev/main/install.sh)" -- "${UPDATE_BRANCH}" 
 
+local-init: ## Initialize local environment using basic defaults
+	@ddev local-init
+
+pull-staging: ## Run a pre-defined WP Migrate DB profile to pull the staging environment
+	@ddev run-migration pull-staging
+
+pull-production: ## Run a pre-defined WP Migrate DB profile to pull the production environment
+	@ddev run-migration pull-production
+
 status: ## Show project status and tools
 	@ddev status
 
@@ -90,11 +99,6 @@ mailhog: ## Launch mailhog in browser
 sequelpro: ## Open current project database in Sequel Pro
 	@ddev sequelpro
 
-pull-staging: ## Run a pre-defined WP Migrate DB profile to pull the staging environment
-	@ddev run-migration pull-staging
-
-pull-production: ## Run a pre-defined WP Migrate DB profile to pull the production environment
-	@ddev run-migration pull-production
 
 xdebug: ## Start Xdebug
 	@ddev xdebug on

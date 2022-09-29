@@ -20,6 +20,8 @@ if [ -f ${FILE} ]; then
   if [ ! -z "${isPull}" ]; then
     wp plugin deactivate wp-rocket --url=${DDEV_PRIMARY_URL}
     wp plugin deactivate redis-cache --url=${DDEV_PRIMARY_URL}
+    echo "Active plugins may not be migrated with wp-cli. Run the migration from the browser to pull the active plugins list."
+    echo "${DDEV_PRIMARY_URL}/wp/wp-admin/tools.php?page=wp-sync-db"
   fi
 else
   echo "Migration ${1} not found."  
