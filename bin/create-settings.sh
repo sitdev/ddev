@@ -25,6 +25,7 @@ if [ -z "${SITE_THEME}" ]; then
 fi
 
 cat <<EOT > $settings_file
+#!/bin/bash
 export SITE_NAME="${SITE_NAME}"
 export SITE_TITLE="${SITE_TITLE}"
 export SITE_THEME="${SITE_THEME}"
