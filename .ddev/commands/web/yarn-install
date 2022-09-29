@@ -1,0 +1,23 @@
+#!/bin/bash
+# currentDirectory
+# themesDirectory
+# pluginsDirectory
+# childThemes
+# installYarn()
+# SITE_NAME
+# SITE_TITLE
+# SITE_THEME
+# NODE_VER
+
+export scriptRoot=$(cd "${BASH_SOURCE%/*}" && pwd)
+source $scriptRoot/.utilities
+source .conf/settings
+if [ -f webpack.config.js ]; then
+    installYarn
+fi
+for theme in $childThemes; do
+  cd ${theme}
+  installYarn
+done
+
+cd "${currentDirectory}"

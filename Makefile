@@ -4,17 +4,32 @@
 UPDATE_BRANCH="main"
 .PHONY: *
 
-all: start develop ## Turn on ddev and run build
+all: develop ## Turn on ddev and run build
 
-develop: running composer-develop yarn-develop mutagen-sync ## Run the development build
+install: ## Install all dev dependencies
+	@ddev composer install --prefer-source
+	@ddev yarn-install
+	@make container-sync
 
-production: running composer-production yarn-production mutagen-sync ## Run the production build
+install-production: ## Install all production dependencies
+	@ddev composer install -o --no-dev
+	@ddev yarn-install
+	@make container-sync
+
+build: ## Run front-end dev build
+	@ddev yarn-build
+
+build-production: ## Run front-end production build
+	@ddev yarn-build production
+
+develop: start install build container-sync ## Turn on ddev and run build
+production: start install-production build-production container-sync ## Run the production build
 
 start: ## Turn on ddev
 	@docker stats --no-stream &> /dev/null || colima start
 	@[ -d .ddev ] || make self-update
 	@ddev list | grep -v "$$(pwd)" | grep "running" &> /dev/null && ddev poweroff || continue 
-	@ddev list | grep "$$(pwd)" | grep "running" &> /dev/null || (ddev start && ddev auth ssh && make mutagen-sync)
+	@ddev list | grep "$$(pwd)" | grep "running" &> /dev/null || (ddev start && ddev auth ssh && make container-sync)
 
 stop: ## Shut down ddev
 	-@ddev poweroff
@@ -24,21 +39,7 @@ restart: stop start ## Restart ddev
 shutdown: stop clean ## Clean build, full shutdown of ddev/colima
 	-@colima stop
 
-composer-develop:
-	@ddev composer install -o --prefer-source
-
-composer-production:
-	@ddev composer install -o --no-dev
-
-yarn-develop:
-	@ddev yarn platform-reset
-	@ddev yarn develop
-
-yarn-production:
-	@ddev yarn
-	@ddev yarn production
-
-mutagen-sync:
+container-sync:
 	@ddev mutagen sync
 
 watch: ## Start the watch task
@@ -81,7 +82,8 @@ factory-reset: clean reset-ddev reset-docker ## Full project clean and reset of 
 self-update: ## Update Situation ddev config from remote repository
 	@[ -z ${UPDATE_BRANCH} ] || /bin/bash -c "$$(curl -fsSL https://raw.githubusercontent.com/sitdev/ddev/main/install.sh)" -- "${UPDATE_BRANCH}" 
 
-local-init: ## Initialize local environment using basic defaults
+local-init: ## Initialize local WP database using basic defaults
+	@ddev local-config
 	@ddev local-init
 
 pull-staging: ## Run a pre-defined WP Migrate DB profile to pull the staging environment
@@ -98,7 +100,6 @@ mailhog: ## Launch mailhog in browser
 
 sequelpro: ## Open current project database in Sequel Pro
 	@ddev sequelpro
-
 
 xdebug: ## Start Xdebug
 	@ddev xdebug on
