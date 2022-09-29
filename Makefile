@@ -79,7 +79,7 @@ reset-docker: ## Remove all docker images from system
 factory-reset: clean reset-ddev reset-docker ## Full project clean and reset of ddev and docker
 
 self-update: ## Update Situation ddev config from remote repository
-	@/bin/bash -c "$$(curl -fsSL https://raw.githubusercontent.com/sitdev/ddev/main/install.sh)" -- "${UPDATE_BRANCH}"
+	@[ -z ${UPDATE_BRANCH} ] && /bin/bash -c "$$(curl -fsSL https://raw.githubusercontent.com/sitdev/ddev/main/install.sh)" -- "${UPDATE_BRANCH}" 
 
 status: ## Show project status and tools
 	@ddev status
