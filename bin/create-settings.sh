@@ -2,6 +2,23 @@
 
 data_folder=.conf
 settings_file="${data_folder}/settings"
+
+guess_node_ver() {
+  if [[ -f package.json && ! -z "$(grep "situation/webpack" package.json)" ]]; then
+    echo 12
+    return 0
+  fi
+  if [ "$(find wp-content/themes -maxdepth 2 -name bower.json)" ]; then
+    echo 10
+    return 0
+  fi
+  if [ "$(find wp-content/themes -maxdepth 2 -name package.json -exec grep -rl "situation/webpack" {} \;)" ]; then
+    echo 12
+    return 0
+  fi
+  echo 16
+}
+
 if [ ! -f $settings_file ]; then
   mkdir -p $data_folder
   touch $settings_file
@@ -24,11 +41,18 @@ if [ -z "${SITE_THEME}" ]; then
   SITE_THEME=${SITE_THEME:-$SITE_NAME}
 fi
 
-cat <<EOT > $settings_file
+if [ -z "${NODE_VER}" ]; then
+  node_guess=$(guess_node_ver)
+  read -p "Node Version: [${node_guess}] " NODE_VER
+  NODE_VER=${NODE_VER:-${node_guess}}
+fi
+
+cat <<EOT >$settings_file
 #!/bin/bash
 export SITE_NAME="${SITE_NAME}"
 export SITE_TITLE="${SITE_TITLE}"
 export SITE_THEME="${SITE_THEME}"
+export NODE_VER="${NODE_VER}"
 EOT
 
 source $settings_file
