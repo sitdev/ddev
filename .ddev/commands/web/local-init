@@ -16,5 +16,5 @@ wp option update page_on_front 2
 
 #read -p "Activate plugins? [yes/NO] " ACTIVATE_PLUGINS
 #ACTIVATE_PLUGINS=${ACTIVATE_PLUGINS:-no}
-wp plugin activate backstage classic-editor producers set-design soil vc-library js_composer wp-image wp-sync-db wp-sync-db-cli wp-sync-db-media-files --url=${DDEV_PRIMARY_URL}
+wp plugin activate advanced-custom-fields-pro backstage classic-editor producers set-design soil vc-library js_composer wp-image wp-sync-db wp-sync-db-cli wp-sync-db-media-files --url=${DDEV_PRIMARY_URL}
 #wp plugin list --url=${DDEV_PRIMARY_URL}
