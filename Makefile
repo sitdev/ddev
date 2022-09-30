@@ -28,8 +28,12 @@ build-production: ## Run front-end production build
 start: ## Turn on ddev
 	@docker stats --no-stream &> /dev/null || colima start
 	@[ -d .ddev ] || make self-update
-	@ddev list | grep -v "$$(pwd)" | grep "running" &> /dev/null && ddev poweroff || continue 
-	@ddev list | grep "$$(pwd)" | grep "running" &> /dev/null || (ddev start && ddev auth ssh && make container-sync)
+	@if [ ! -z "$$(make running 2>/dev/null)" ]; then \
+		if ddev list | grep -q running; then \
+		  ddev poweroff; \
+		fi; \
+		ddev start && ddev auth ssh && make container-sync; \
+	fi
 
 stop: ## Shut down ddev
 	-@ddev poweroff
@@ -105,7 +109,7 @@ xdebug: ## Start Xdebug
 	@ddev xdebug on
 
 running:
-	@ddev list | grep "$$(pwd)" | grep "running" &> /dev/null || (echo "Run Make to start" && exit 1)
+	@[ ! -z "$$(ddev exec pwd 2>/dev/null)" ] || (echo "Run \"make\" or \"make start\" to start"; exit 1)
 
 help: ## Show this dialog
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
