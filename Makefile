@@ -4,7 +4,7 @@
 UPDATE_BRANCH="main"
 .PHONY: *
 
-all: develop
+all: develop help
 
 develop: start install build container-sync ## Turn on ddev and run build
 production: start install-production build-production container-sync ## Run the production build
@@ -107,5 +107,6 @@ xdebug: ## Start Xdebug
 running:
 	@ddev list | grep "$$(pwd)" | grep "running" &> /dev/null || (echo "Run Make to start" && exit 1)
 
-help:
+help: ## Show this dialog
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
+	@printf "\nAdditional commands:\n\n  ddev composer *\n  ddev yarn *\n\nMore: https://ddev.readthedocs.io/en/latest/users/basics/cli-usage/\n\n"
