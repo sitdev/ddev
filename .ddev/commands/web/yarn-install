@@ -10,11 +10,9 @@
 
 export scriptRoot=$(cd "${BASH_SOURCE%/*}" && pwd)
 source $scriptRoot/.utilities
-if [ -f webpack.config.js ]; then
-    installYarn
-fi
-for theme in $childThemes; do
-  cd ${theme}
+
+for buildDir in $buildDirs; do
+  cd ${buildDir}
   installYarn
 done
 

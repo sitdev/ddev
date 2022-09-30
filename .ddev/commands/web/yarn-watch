@@ -3,6 +3,7 @@
 # themesDirectory
 # pluginsDirectory
 # childThemes
+# buildDirs
 # installYarn()
 # SITE_NAME
 # SITE_TITLE
@@ -13,9 +14,16 @@ export isProduction=$([[ ${1} == "production" ]] && echo '1')
 export scriptRoot=$(cd "${BASH_SOURCE%/*}" && pwd)
 source $scriptRoot/.utilities
 
-for buildDir in $buildDirs; do
-  cd ${buildDir}
-  buildYarn
-done
+if [ $(echo -n "$buildDirs" | grep -c '^') -gt 1 ]; then
+  PS3="Choose a folder to watch: "
+  select buildDir in $buildDirs; do
+    cd ${buildDir}
+    watchYarn
+    break
+  done
+else
+  cd ${buildDirs}
+  watchYarn
+fi
 
 cd "${currentDirectory}"

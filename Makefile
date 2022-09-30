@@ -47,7 +47,7 @@ container-sync:
 	@ddev mutagen sync
 
 watch: ## Start the watch task
-	@ddev yarn watch
+	@ddev yarn-watch
 	
 logging: ## Tail the ddev log
 	@ddev logs -f

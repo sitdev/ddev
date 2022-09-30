@@ -9,6 +9,14 @@ export themesDirectory=${currentDirectory}/wp-content/themes
 export pluginsDirectory=${currentDirectory}/wp-content/plugins
 export childThemes=$(ls -d ${themesDirectory}/*/ | grep -v orchestrator)
 
+getPotentialBuildDirs(){
+  [[ -f  webpack.config.js || -f bower.json ]] && echo ${currentDirectory}
+  for theme in $childThemes; do
+    [[ -f  ${theme}/webpack.config.js || -f ${theme}/bower.json ]] && echo ${theme}
+  done
+}
+export buildDirs=$(getPotentialBuildDirs)
+
 installYarn() {
   if [ -f package.json ]; then
     # Handle edge cases where there are multiple themes that may be using different build processes
@@ -59,4 +67,27 @@ buildYarn() {
       nvm use 10
     fi
   fi
+}
+
+watchYarn(){
+  if [ -f package.json ]; then
+      if [[ $NODE_VER == "12" && -f bower.json ]]; then
+        nvm install 10
+        nvm use 10
+      elif [[ $NODE_VER == "10" && -f webpack.config.js ]]; then
+        nvm install 12
+        nvm use 12
+      fi
+      if [ -f webpack.config.js ]; then
+        yarn watch
+      fi
+      if [ -f gulpfile.js ]; then
+        gulp watch
+      fi
+      if [[ $NODE_VER == "12" && -f bower.json ]]; then
+        nvm use 12
+      elif [[ $NODE_VER == "10" && -f webpack.config.js ]]; then
+        nvm use 10
+      fi
+    fi
 }
