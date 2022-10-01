@@ -58,7 +58,7 @@ clean: ## Clean build
 	@find wp-content/themes -type d -name "bower_components" -prune -exec rm -rf {} \;
 	@find wp-content/themes -type d  -name "dist" -prune -exec rm -rf {} \;
 
-reset-project: clean ## Clean build and git hard reset/pull
+reset: clean ## Clean build and git hard reset/pull
 	@mv wp-content/uploads ./ && rm -rf wp-content && mkdir -p wp-content && mv uploads wp-content/
 	@git add -A .
 	@git reset --hard
