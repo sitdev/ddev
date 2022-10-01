@@ -8,11 +8,14 @@ export currentDirectory=$(pwd)
 export themesDirectory=${currentDirectory}/wp-content/themes
 export pluginsDirectory=${currentDirectory}/wp-content/plugins
 export childThemes=$(ls -d ${themesDirectory}/*/ | grep -v orchestrator)
+if [[ -f .ddev/.updated || -f .ddev/.plugin-dev-mode ]]; then
+  export SOFT_RESET=1
+fi
 
-getPotentialBuildDirs(){
-  [[ -f  webpack.config.js || -f bower.json ]] && echo ${currentDirectory}
+getPotentialBuildDirs() {
+  [[ -f webpack.config.js || -f bower.json ]] && echo ${currentDirectory}
   for theme in $childThemes; do
-    [[ -f  ${theme}/webpack.config.js || -f ${theme}/bower.json ]] && echo ${theme}
+    [[ -f ${theme}/webpack.config.js || -f ${theme}/bower.json ]] && echo ${theme}
   done
 }
 export buildDirs=$(getPotentialBuildDirs)
@@ -28,16 +31,12 @@ installYarn() {
       nvm use 12
     fi
     # Continue to normal installation
-    if [ ! -z "$(grep "platform-reset" package.json)" ]; then
-      yarn platform-reset
-    else
-      yarn install
-      if [ -f bower.json ]; then
-        [ ! -z "$(which bower)" ] || yarn global add bower
-        bower install
-      fi
+    [ -z $SOFT_RESET ] && yarn || yarn install --check-files 
+    if [ -f bower.json ]; then
+      [ ! -z "$(which bower)" ] || yarn global add bower
+      bower install
     fi
-    # Reset node version changes 
+    # Reset node version changes
     if [[ $NODE_VER == "12" && -f bower.json ]]; then
       nvm use 12
     elif [[ $NODE_VER == "10" && -f webpack.config.js ]]; then
@@ -47,6 +46,7 @@ installYarn() {
 }
 
 buildYarn() {
+  [ ! -z $SOFT_RESET ] && installYarn
   if [ -f package.json ]; then
     if [[ $NODE_VER == "12" && -f bower.json ]]; then
       nvm install 10
@@ -55,7 +55,7 @@ buildYarn() {
       nvm install 12
       nvm use 12
     fi
-    if [ ! -z "$(grep "platform-reset" package.json)" ]; then
+    if [ -f webpack.config.js ]; then
       [ -z "${isProduction}" ] && yarn develop || yarn production
     fi
     if [ -f gulpfile.js ]; then
@@ -69,25 +69,25 @@ buildYarn() {
   fi
 }
 
-watchYarn(){
+watchYarn() {
   if [ -f package.json ]; then
-      if [[ $NODE_VER == "12" && -f bower.json ]]; then
-        nvm install 10
-        nvm use 10
-      elif [[ $NODE_VER == "10" && -f webpack.config.js ]]; then
-        nvm install 12
-        nvm use 12
-      fi
-      if [ -f webpack.config.js ]; then
-        yarn watch
-      fi
-      if [ -f gulpfile.js ]; then
-        gulp watch
-      fi
-      if [[ $NODE_VER == "12" && -f bower.json ]]; then
-        nvm use 12
-      elif [[ $NODE_VER == "10" && -f webpack.config.js ]]; then
-        nvm use 10
-      fi
+    if [[ $NODE_VER == "12" && -f bower.json ]]; then
+      nvm install 10
+      nvm use 10
+    elif [[ $NODE_VER == "10" && -f webpack.config.js ]]; then
+      nvm install 12
+      nvm use 12
     fi
+    if [ -f webpack.config.js ]; then
+      yarn watch
+    fi
+    if [ -f gulpfile.js ]; then
+      gulp watch
+    fi
+    if [[ $NODE_VER == "12" && -f bower.json ]]; then
+      nvm use 12
+    elif [[ $NODE_VER == "10" && -f webpack.config.js ]]; then
+      nvm use 10
+    fi
+  fi
 }

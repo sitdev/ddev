@@ -11,9 +11,10 @@
 export scriptRoot=$(cd "${BASH_SOURCE%/*}" && pwd)
 source $scriptRoot/.utilities
 
-for buildDir in $buildDirs; do
-  cd ${buildDir}
-  installYarn
-done
-
+if [ -z $SOFT_RESET ]; then
+  for buildDir in $buildDirs; do
+    cd ${buildDir}
+    installYarn
+  done
+fi
 cd "${currentDirectory}"
