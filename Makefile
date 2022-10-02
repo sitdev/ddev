@@ -52,11 +52,8 @@ watch: ## Start the watch task
 logging: ## Tail the ddev log
 	@ddev logs -f
 
-clean: ## Clean build
-	@rm -rf wp-content/vendor wp-content/plugins wp wp-content/themes/orchestrator
-	@find . -type d -name "node_modules" -prune -exec rm -rf {} \;
-	@find wp-content/themes -type d -name "bower_components" -prune -exec rm -rf {} \;
-	@find wp-content/themes -type d  -name "dist" -prune -exec rm -rf {} \;
+clean: running ## Clean build
+	@ddev clean-build
 
 reset: clean ## Clean build and git hard reset/pull
 	@mv wp-content/uploads ./ && rm -rf wp-content && mkdir -p wp-content && mv uploads wp-content/
@@ -68,6 +65,7 @@ reset: clean ## Clean build and git hard reset/pull
 update: running ## Composer update
 	@touch .ddev/.updated
 	@ddev composer update -o --no-install
+	@make develop
 	@make self-update
 	@make restart
 
