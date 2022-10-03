@@ -1,5 +1,9 @@
 #!/bin/bash
 
+is_multisite() {
+  cat wp-config.php | grep WP_ALLOW_MULTISITE | grep true
+}
+
 cat <<EOT > ${DDEV_APPROOT}/${DDEV_DOCROOT}/local-config.php
 <?php
 const DB_NAME = 'db';
@@ -7,9 +11,13 @@ const DB_USER = 'db';
 const DB_PASSWORD = 'db';
 const DB_HOST = 'db';
 const ENVIRONMENT = 'local';
-const WP_SITEURL = '${DDEV_PRIMARY_URL}/wp';
-const WP_HOME = '${DDEV_PRIMARY_URL}/';
-const WP_CONTENT_URL = '${DDEV_PRIMARY_URL}/wp-content';
+const WP_HOME = '${DDEV_PRIMARY_URL}';
 EOT
 
-
+if [ ! -z "$(is_multisite)" ]; then
+  echo "const WP_SITEURL = '${DDEV_PRIMARY_URL}';" >> ${DDEV_APPROOT}/${DDEV_DOCROOT}/local-config.php
+  echo "const DOMAIN_CURRENT_SITE = '${DDEV_SITENAME}.${DDEV_TLD}';" >> ${DDEV_APPROOT}/${DDEV_DOCROOT}/local-config.php
+else
+  echo "const WP_SITEURL = '${DDEV_PRIMARY_URL}/wp';" >> ${DDEV_APPROOT}/${DDEV_DOCROOT}/local-config.php
+  echo "const WP_CONTENT_URL = '${DDEV_PRIMARY_URL}/wp-content';" >> ${DDEV_APPROOT}/${DDEV_DOCROOT}/local-config.php
+fi
