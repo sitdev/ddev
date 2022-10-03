@@ -13,6 +13,15 @@ export isProduction=$([[ ${1} == "production" ]] && echo '1')
 
 export scriptRoot=$(cd "${BASH_SOURCE%/*}" && pwd)
 source $scriptRoot/.utilities
+eol=$'\n'
+hostNames=${DDEV_HOSTNAME//,/$eol}
+if [ $(echo -n "$hostNames" | grep -c '^') -gt 1 ]; then
+  PS3="Choose a hostname to alias: "
+  select hostName in $hostNames; do
+    echo $hostName
+    break
+  done
+fi
 
 if [ $(echo -n "$buildDirs" | grep -c '^') -gt 1 ]; then
   PS3="Choose a folder to watch: "
