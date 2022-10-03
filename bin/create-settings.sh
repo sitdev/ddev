@@ -19,6 +19,10 @@ guess_node_ver() {
   echo 16
 }
 
+is_multisite() {
+  cat wp-config.php | grep WP_ALLOW_MULTISITE | grep true
+}
+
 if [ ! -f $settings_file ]; then
   mkdir -p $data_folder
   touch $settings_file
@@ -42,11 +46,22 @@ if [ -z "${NODE_VER}" ]; then
   NODE_VER=${NODE_VER:-${node_guess}}
 fi
 
+if [ ! -z "$(is_multisite)" ] && [ -z "${ADDITIONAL_HOSTS}" ]; then
+  echo "Additional Multisite hosts"
+  read -p "(separate by space, no protocol or TLD - eg \"situationuk townhall situationgroup\": " ADDITIONAL_HOSTS
+fi
+
 cat <<EOT >$settings_file
 #!/bin/bash
 export SITE_NAME="${SITE_NAME}"
 export SITE_TITLE="${SITE_TITLE}"
 export NODE_VER="${NODE_VER}"
 EOT
+
+if [ ! -z "${ADDITIONAL_HOSTS}" ]; then
+  cat <<EOT >>$settings_file
+export ADDITIONAL_HOSTS="${ADDITIONAL_HOSTS}"
+EOT
+fi
 
 source $settings_file
