@@ -1,6 +1,6 @@
 #!/bin/bash
 
-mkdir -p .ddev/migrations
+mkdir -p .conf/migrations
 read -p "Migration name: [pull-staging] " MIGRATION_NAME
 MIGRATION_NAME=${MIGRATION_NAME:-pull-staging}
-wp option get wpsdb_settings --format=json --url=${DDEV_PRIMARY_URL} > ".ddev-c/migrations/${MIGRATION_NAME}.json"
+wp option get wpsdb_settings --format=json --url=${DDEV_PRIMARY_URL} > ".conf/migrations/${MIGRATION_NAME}.json"
