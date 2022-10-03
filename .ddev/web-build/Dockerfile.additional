@@ -1,0 +1,2 @@
+RUN apt-get -qq update && apt-get install -y libxi6 libgconf-2-4
+RUN yarn global add webpack webpack-cli replace

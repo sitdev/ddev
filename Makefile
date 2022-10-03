@@ -54,6 +54,7 @@ logging: ## Tail the ddev log
 
 clean: running ## Clean build
 	@ddev clean-build
+	@make container-sync
 
 reset: clean ## Clean build and git hard reset/pull
 	@mv wp-content/uploads ./ && rm -rf wp-content && mkdir -p wp-content && mv uploads wp-content/
@@ -61,12 +62,14 @@ reset: clean ## Clean build and git hard reset/pull
 	@git reset --hard
 	@git fetch
 	@git pull
+	@make container-sync
 
 update: running ## Composer update
 	@touch .ddev/.updated
 	@ddev composer update -o --no-install
 	@make develop
 	@make self-update
+	@make container-sync
 	@make restart
 
 self-update: ## Update Situation ddev config from remote repository. Branch is defined by $UPDATE_BRANCH.
