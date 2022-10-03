@@ -54,6 +54,7 @@ logging: ## Tail the ddev log
 
 clean: running ## Clean build
 	@ddev clean-build
+	@/bin/bash .ddev/commands/web/clean-build
 	@make container-sync
 
 reset: clean ## Clean build and git hard reset/pull
