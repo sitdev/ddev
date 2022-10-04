@@ -22,25 +22,10 @@ export buildDirs=$(getPotentialBuildDirs)
 
 installYarn() {
   if [ -f package.json ]; then
-    # Handle edge cases where there are multiple themes that may be using different build processes
-    if [[ $NODE_VER == "12" && -f bower.json ]]; then
-      nvm install 10
-      nvm use 10
-    elif [[ $NODE_VER == "10" && -f webpack.config.js ]]; then
-      nvm install 12
-      nvm use 12
-    fi
-    # Continue to normal installation
     [ -z $SOFT_RESET ] && yarn || yarn install --check-files 
     if [ -f bower.json ]; then
       [ ! -z "$(which bower)" ] || yarn global add bower
       bower install
-    fi
-    # Reset node version changes
-    if [[ $NODE_VER == "12" && -f bower.json ]]; then
-      nvm use 12
-    elif [[ $NODE_VER == "10" && -f webpack.config.js ]]; then
-      nvm use 10
     fi
   fi
 }
@@ -48,46 +33,22 @@ installYarn() {
 buildYarn() {
   [ ! -z $SOFT_RESET ] && installYarn
   if [ -f package.json ]; then
-    if [[ $NODE_VER == "12" && -f bower.json ]]; then
-      nvm install 10
-      nvm use 10
-    elif [[ $NODE_VER == "10" && -f webpack.config.js ]]; then
-      nvm install 12
-      nvm use 12
-    fi
     if [ -f webpack.config.js ]; then
       [ -z "${isProduction}" ] && yarn develop || yarn production
     fi
     if [ -f gulpfile.js ]; then
       [ -z "${isProduction}" ] && gulp || gulp --production
     fi
-    if [[ $NODE_VER == "12" && -f bower.json ]]; then
-      nvm use 12
-    elif [[ $NODE_VER == "10" && -f webpack.config.js ]]; then
-      nvm use 10
-    fi
   fi
 }
 
 watchYarn() {
   if [ -f package.json ]; then
-    if [[ $NODE_VER == "12" && -f bower.json ]]; then
-      nvm install 10
-      nvm use 10
-    elif [[ $NODE_VER == "10" && -f webpack.config.js ]]; then
-      nvm install 12
-      nvm use 12
-    fi
     if [ -f webpack.config.js ]; then
       yarn watch
     fi
     if [ -f gulpfile.js ]; then
       gulp watch
-    fi
-    if [[ $NODE_VER == "12" && -f bower.json ]]; then
-      nvm use 12
-    elif [[ $NODE_VER == "10" && -f webpack.config.js ]]; then
-      nvm use 10
     fi
   fi
 }

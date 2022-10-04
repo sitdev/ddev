@@ -13,7 +13,7 @@ export isProduction=$([[ ${1} == "production" ]] && echo '1')
 export scriptRoot=$(cd "${BASH_SOURCE%/*}" && pwd)
 source $scriptRoot/.utilities
 
-if [ ! -z $SOFT_RESET ]; then
+if [ ! -z "${SOFT_RESET}" ]; then
   find * -type d -path "node_modules/*situation*" -prune -exec rm -rf {} \;
   find * -type d -path "bower_components/set-design*" -prune -exec rm -rf {} \;
 fi
@@ -25,6 +25,6 @@ done
 
 cd "${currentDirectory}"
 
-if [ ! -z $SOFT_RESET ]; then
+if [ ! -z "${SOFT_RESET}" ]; then
   rm -f .ddev/.updated
 fi
