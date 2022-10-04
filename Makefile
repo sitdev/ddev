@@ -52,9 +52,11 @@ watch: ## Start the watch task
 logging: ## Tail the ddev log
 	@ddev logs -f
 
-clean: running ## Clean build
-	@ddev clean-build
-	@make container-sync
+clean: ## Clean build
+	@isRunning="$$(ddev exec pwd 2>/dev/null)"; \
+	/bin/bash .ddev/commands/host/clean-build; \
+	ddev mutagen reset || true; \
+	[ ! -z "$${isRunning}" ] && make start || true
 
 reset: clean ## Clean build and git hard reset/pull
 	@mv wp-content/uploads ./ && rm -rf wp-content && mkdir -p wp-content && mv uploads wp-content/
