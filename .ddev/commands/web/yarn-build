@@ -15,6 +15,7 @@ source $scriptRoot/.utilities
 
 if [ ! -z "${SOFT_RESET}" ]; then
   find * -type d -path "node_modules/*situation*" -prune -exec rm -rf {} \;
+  find * -type d -path "node_modules/situation*" -prune -exec rm -rf {} \;
   find * -type d -path "bower_components/set-design*" -prune -exec rm -rf {} \;
 fi
 

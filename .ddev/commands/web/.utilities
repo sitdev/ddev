@@ -24,7 +24,7 @@ installYarn() {
   if [ -f package.json ]; then
     [ -z $SOFT_RESET ] && yarn || yarn install --check-files 
     if [ -f bower.json ]; then
-      [ ! -z "$(which bower)" ] || yarn global add bower
+      [ -z "$(which bower)" ] && yarn global add bower || true
       bower install
     fi
   fi

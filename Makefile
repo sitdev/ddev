@@ -31,9 +31,9 @@ start: ## Turn on ddev
 		if ddev list | grep -q running; then \
 		  ddev poweroff; \
 		fi; \
-		ddev start && ddev auth ssh; \
+		ddev start && ddev auth ssh && make status; \
 	fi
-	@make status
+	
 
 stop: ## Shut down ddev
 	-@ddev poweroff
