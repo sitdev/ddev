@@ -20,7 +20,7 @@ if [[ "${NODE_VER}" != "16" ]]; then
   cat <<EOT >> .ddev/config.local.yaml
 hooks:
   post-start:
-  - exec: nvm install ${NODE_VER}
+  - exec: nvm use ${NODE_VER}
 EOT
 fi
 

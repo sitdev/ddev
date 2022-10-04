@@ -3,7 +3,7 @@ type: php
 docroot: ""
 php_version: "7.4"
 webserver_type: apache-fpm
-webimage_extra_packages: [libxi6,libgconf-2-4]
+webimage_extra_packages: [libglu1,libxi6,libgconf-2-4]
 router_http_port: "80"
 router_https_port: "443"
 xdebug_enabled: false
@@ -20,7 +20,7 @@ upload_dir: wp-content/uploads
 nodejs_version: "16"
 hooks:
   post-start:
-    - exec: "/bin/bash ~/startup.sh"
+    - exec: ~/startup.sh
 
 
 # Key features of ddev's config.yaml:
