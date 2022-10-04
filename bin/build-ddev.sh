@@ -16,12 +16,5 @@ for host in $ADDITIONAL_HOSTS ; do
   echo "  - $host" >> .ddev/config.local.yaml
 done
 fi
-if [[ "${NODE_VER}" != "16" ]]; then
-  cat <<EOT >> .ddev/config.local.yaml
-hooks:
-  post-start:
-  - exec: nvm use ${NODE_VER}
-EOT
-fi
 
 [ -d .conf/.ddev ] && cp -RT .conf/.ddev/ .ddev/
