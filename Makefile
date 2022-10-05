@@ -44,7 +44,7 @@ shutdown: stop clean ## Clean build, full shutdown of ddev/colima
 	-@colima stop
 
 container-sync:
-	@ddev mutagen sync
+	@ddev mutagen sync 2> /dev/null || ddev mutagen reset || true
 
 watch: ## Start the watch task
 	@ddev yarn-watch
