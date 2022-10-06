@@ -32,16 +32,17 @@ https://ddev.readthedocs.io/en/stable/
 
 ## Useful Commands
 
-| Command                 | Description                                                                                                             |
-|-------------------------|-------------------------------------------------------------------------------------------------------------------------|
-| `make help `            | Shows info about most of the available make commands.                                                                   |
-| `make`                  | Spins up the ddev container, runs the full build.                                                                       |
-| `make start`            | Spins up the ddev container.                                                                                            |
-| `make stop`             | Stops all running ddev containers.                                                                                      |
-| `make install`          | Installs all of the dev dependencies for composer and yarn.                                                             |
-| `make build`            | Runs the development build.                                                                                             |
-| `make watch`            | Runs the watch task.                                                                                                    |
-| `make update`           | Runs composer update and updates the Makefile and ddev configuration files from this repo.                              |
-| `make clean`            | Cleans the build and installed dependencies.                                                                            |
-| `make plugin-dev-mode`  | Toggles an alternate build process which clears and reinstalls all Situation node_modules content during `make build`.  |
+| Command                | Description                                                                                                                                             |
+|------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `make help `           | Shows info about most of the available make commands.                                                                                                   |
+| `make`                 | Spins up the ddev container, runs the full build.                                                                                                       |
+| `make start`           | Spins up the ddev container.                                                                                                                            |
+| `make stop`            | Stops all running ddev containers.                                                                                                                      |
+| `make install`         | Installs all of the dev dependencies for composer and yarn.                                                                                             |
+| `make build`           | Runs the development build.                                                                                                                             |
+| `make watch`           | Runs the watch task.                                                                                                                                    |
+| `make update`          | Runs composer update and updates the Makefile and ddev configuration files from this repo.                                                              |
+| `make clean`           | Cleans the build and installed dependencies.                                                                                                            |
+| `make xdebug`          | Turns on Xdebug in ddev. Works out of the box with phpstorm, but you will need to clear any previous xdebug mappings under Preferences > PHP > Servers. |
+| `make plugin-dev-mode` | Toggles an alternate build process which clears and reinstalls all Situation node_modules content during `make build`.                                  |
 
