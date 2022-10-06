@@ -17,4 +17,4 @@ for host in $ADDITIONAL_HOSTS ; do
 done
 fi
 
-[ -d .conf/.ddev ] && cp -RT .conf/.ddev/ .ddev/
+[ -d .conf/.ddev ] && cp -r .conf/.ddev/ .ddev
