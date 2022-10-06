@@ -1,0 +1,9 @@
+#!/bin/bash
+
+if [ -f .ddev/.plugin-dev-mode ]; then
+    rm -f .ddev/.plugin-dev-mode
+    echo "Plugin dev mode deactivated"
+else
+    touch .ddev/.plugin-dev-mode
+    echo "Plugin dev mode activated"
+fi

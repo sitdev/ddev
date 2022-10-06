@@ -88,7 +88,7 @@ pull-production: ## Run a pre-defined WP Migrate DB profile to pull the producti
 	@ddev run-migration pull-production
 
 plugin-dev-mode:
-	@touch .ddev/.plugin-dev-mode
+	@ddev toggle-plugin-dev-mode
 
 status: ## Show project status and tools
 	@ddev status
