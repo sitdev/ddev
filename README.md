@@ -14,8 +14,7 @@ brew install colima
 colima start --cpu 4 --memory 6 --disk 100 --dns=1.1.1.1
 ```
 
-Note: if your web project parent directory is not somewhere in your $HOME folder, \n\
-replace the colima start command above with this:
+Note: if your web project parent directory is not somewhere in your `$HOME` folder, replace the colima start command above with this:
 ```
 colima start --cpu 4 --memory 6 --disk 100 --dns=1.1.1.1 --mount "/Volumes/my-project-parent:w" --mount "~:w"
 ```
