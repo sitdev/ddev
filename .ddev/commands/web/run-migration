@@ -11,6 +11,13 @@ FILE=".conf/migrations/${1}.json"
 if [ -f ${FILE} ]; then
   echo "Importing Migration"
   wp option update wpsdb_settings --url=${DDEV_PRIMARY_URL} --format=json < ${FILE}
+  wp plugin is-installed wp-sync-db-cli --url=${DDEV_PRIMARY_URL}
+  installed=$?
+  if [ $installed -eq '1' ]; then composer require wp-sync-db/wp-sync-db-cli:dev-master --dev; fi
+  wp plugin is-active wp-sync-db-cli --url=${DDEV_PRIMARY_URL}
+  active=$?
+  if [ $active -eq '1' ]; then wp plugin activate wp-sync-db-cli --url=${DDEV_PRIMARY_URL}; fi
+
   echo "Running Migration..."
   migrationProfile=$(wp option get wpsdb_settings)
   isPull=$(echo "${migrationProfile}" | grep action | grep pull)
