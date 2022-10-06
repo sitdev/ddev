@@ -66,7 +66,7 @@ reset: clean ## Clean build and git hard reset/pull
 	@git pull
 	@make container-sync
 
-update: running ## Composer update
+update: start ## Composer update
 	@touch .ddev/.updated
 	@ddev composer update -o --no-install
 	@make develop
