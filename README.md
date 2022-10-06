@@ -44,5 +44,5 @@ https://ddev.readthedocs.io/en/stable/
 | `make update`          | Runs composer update and updates the Makefile and ddev configuration files from this repo.                                                              |
 | `make clean`           | Cleans the build and installed dependencies.                                                                                                            |
 | `make xdebug`          | Turns on Xdebug in ddev. Works out of the box with phpstorm, but you will need to clear any previous xdebug mappings under Preferences > PHP > Servers. |
-| `make plugin-dev-mode` | Toggles an alternate build process which clears and reinstalls all Situation node_modules content during `make build`.                                  |
+| `make plugin-dev-mode` | Toggles an alternate build process which clears and re-installs all Situation node_modules content before each build.                                   |
 
