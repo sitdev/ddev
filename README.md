@@ -32,7 +32,7 @@ https://ddev.readthedocs.io/en/stable/
 
 ## Useful Commands
 
-| Command        | Info                                                                                       |
+| Command        | Description                                                                                |
 |----------------|--------------------------------------------------------------------------------------------|
 | `make help `   | Shows info about most of the available make commands.                                      |
 | `make`         | Spins up the ddev container, runs the full build.                                          |
