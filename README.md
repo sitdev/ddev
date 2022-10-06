@@ -38,8 +38,9 @@ https://ddev.readthedocs.io/en/stable/
 | `make`         | Spins up the ddev container, runs the full build.                                          |
 | `make start`   | Spins up the ddev container.                                                               |
 | `make stop`    | Stops all running ddev containers.                                                         |
-| `make install` | Installs all of the composer and yarn dev dependencies.                                    |
+| `make install` | Installs all of the dev dependencies for composer and yarn.                                |
 | `make build`   | Runs the development build.                                                                |
 | `make watch`   | Runs the watch task.                                                                       |
 | `make update`  | Runs composer update and updates the Makefile and ddev configuration files from this repo. |
 | `make clean`   | Cleans the build and installed dependencies.                                               |
+
