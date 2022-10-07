@@ -67,12 +67,9 @@ reset: clean ## Clean build and git hard reset/pull
 	@make container-sync
 
 update: start ## Composer update
-	@touch .ddev/.updated
-	@ddev composer update -o --no-install
-	@make develop
+	@ddev platform-update
 	@make self-update
-	@make container-sync
-	@make restart
+	@[ -z ${UPDATE_BRANCH} ] || make restart
 
 self-update: ## Update Situation ddev config from remote repository. Branch is defined by $UPDATE_BRANCH.
 	@[ -z ${UPDATE_BRANCH} ] || /bin/bash -c "$$(curl -fsSL https://raw.githubusercontent.com/sitdev/ddev/main/install.sh)" -- "${UPDATE_BRANCH}" 

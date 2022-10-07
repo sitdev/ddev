@@ -1,0 +1,16 @@
+#!/bin/bash
+
+echo "Checking for updates..."
+updates=$(ddev composer update -o --no-install 2>&1)
+echo "${updates}"
+if [[ "$updates" != *"Nothing to modify in lock file"* ]]; then
+  ddev composer install -o --prefer-source
+fi
+
+if [[ "$updates" == *"set-design"* ]] || [[ "$updates" == *"vc-library"* ]] || [[ "$updates" == *"situation/scripts"* ]] || [[ "$updates" == *"quiz-builder"* ]]; then
+  touch .ddev/.updated
+  echo "Found platform updates, rebuilding yarn cache..."
+  ddev yarn-install
+  rm -f .ddev/.updated
+  ddev mutagen sync
+fi

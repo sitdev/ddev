@@ -11,6 +11,9 @@ export childThemes=$(ls -d ${themesDirectory}/*/ | grep -v orchestrator)
 if [[ -f .ddev/.updated || -f .ddev/.plugin-dev-mode ]]; then
   export SOFT_RESET=1
 fi
+if [ -f .ddev/.updated ]; then
+  export DOING_UPDATE=1
+fi
 
 getPotentialBuildDirs() {
   [[ -f webpack.config.js || -f bower.json ]] && echo ${currentDirectory}
