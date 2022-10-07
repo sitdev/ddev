@@ -1,7 +1,11 @@
 #!/bin/bash
 
 export scriptRoot=$(cd "${BASH_SOURCE%/*}" && pwd)
-
+revision=$(cd $scriptRoot && git rev-parse HEAD)
+[ -f .ddev/.revision ] && oldVer=$(cat .ddev/.revision) || true
+if [[ $revision != $oldVer ]]; then
+  echo "Update found..."
+fi
 source "${scriptRoot}/bin/check-dependencies.sh"
 source "${scriptRoot}/bin/create-settings.sh"
 if [ -d .git ]; then
@@ -14,6 +18,7 @@ if [ -d .git ]; then
   grep "mutagen" .git/hooks/post-checkout &> /dev/null || echo '[ -z "${DDEV_SITENAME}" ] && (ddev mutagen sync 2> /dev/null || ddev mutagen reset || true)' >> .git/hooks/post-checkout
 fi
 source "${scriptRoot}/bin/build-ddev.sh"
+echo $revision > .ddev/.revision
 
 cp -r "${scriptRoot}/Makefile" ./
 git add -A .
