@@ -79,6 +79,7 @@ self-update: ## Update Situation ddev config from remote repository. Branch is d
 
 local-init: start install ## Initialize local WP database using basic defaults
 	@ddev local-config
+	@make container-sync
 	@ddev local-init
 
 pull-staging: ## Run a pre-defined WP Migrate DB profile to pull the staging environment
