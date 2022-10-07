@@ -27,8 +27,10 @@ if [ -f ${FILE} ]; then
   if [ ! -z "${isPull}" ]; then
     wp plugin deactivate wp-rocket --url=${DDEV_PRIMARY_URL}
     wp plugin deactivate redis-cache --url=${DDEV_PRIMARY_URL}
+    git restore --staged wp-config.php
+    git restore wp-config.php
   fi
 else
   echo "Migration ${1} not found."  
-  echo "Delete existing migrations, set up the new one, and run \"ddev export-migration\"."
+  echo "Delete existing migrations, set up the new one, and run ddev export-migration."
 fi
