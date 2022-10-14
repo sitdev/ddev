@@ -1,4 +1,7 @@
 #!/bin/bash
+
+## Description: Run the watch task.
+
 # currentDirectory
 # themesDirectory
 # pluginsDirectory

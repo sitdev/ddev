@@ -1,5 +1,8 @@
 #!/bin/bash
 
+## Description: Activate alternate build mode where the local dependencies are cleared and restored before the build.
+
+
 if [ -f .ddev/.plugin-dev-mode ]; then
     rm -f .ddev/.plugin-dev-mode
     echo "Plugin dev mode deactivated"

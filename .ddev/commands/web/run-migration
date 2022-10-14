@@ -1,5 +1,9 @@
 #!/bin/bash
 
+## Description: Run a previously saved WP Sync DB migration profile.
+## Usage: run-migration [args]
+## Example: "ddev run-migration pull-staging"
+
 if [ -z $1 ]; then 
   wp wpsdb migrate --help --url=${DDEV_PRIMARY_URL}
   ls .ddev/migrations | sed -e 's/\.json//' 

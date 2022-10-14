@@ -1,5 +1,7 @@
 #!/bin/bash
 
+## Description: Initialize a local WP database using standard defaults.
+
 #which replace &> /dev/null || yarn global add replace
 
 read -p "sit-admin password: [test] " USER_PASS

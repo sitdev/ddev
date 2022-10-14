@@ -1,5 +1,7 @@
 #!/bin/bash
 
+## Description: Update composer dependencies and rebuild yarn cache if needed.
+
 echo "Checking for updates..."
 updates=$(ddev composer update -o --no-install 2>&1)
 echo "${updates}"

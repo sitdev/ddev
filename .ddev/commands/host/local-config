@@ -1,5 +1,7 @@
 #!/bin/bash
 
+## Description: Create the ddev local-config.php file.
+
 is_multisite() {
   cat wp-config.php | grep WP_ALLOW_MULTISITE | grep true
 }
