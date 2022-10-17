@@ -69,7 +69,7 @@ reset: clean ## Clean build and git hard reset/pull
 
 update: start ## Composer update
 	@ddev platform-update
-	@[ ! -z "$$(make self-update)" ] && make restart
+	@[ ! -z "$$(make self-update)" ] && make restart || true
 
 self-update: ## Update Situation ddev config from remote repository. Branch is defined by $UPDATE_BRANCH.
 	@[ -z ${UPDATE_BRANCH} ] || /bin/bash -c "$$(curl -fsSL https://raw.githubusercontent.com/sitdev/ddev/main/install.sh)" -- "${UPDATE_BRANCH}" 
