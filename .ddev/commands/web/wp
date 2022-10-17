@@ -3,7 +3,5 @@
 ## Description: Run WordPress CLI inside the web container
 ## Usage: wp [flags] [args]
 ## Example: "ddev wp core version" or "ddev wp plugin install user-switching --activate"
-## ProjectTypes: wordpress
-## ExecRaw: true
 
 wp "$@" --url=${DDEV_PRIMARY_URL}
