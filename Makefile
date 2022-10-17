@@ -74,7 +74,8 @@ update: start ## Composer update
 self-update: ## Update Situation ddev config from remote repository. Branch is defined by $UPDATE_BRANCH.
 	@[ -z ${UPDATE_BRANCH} ] || /bin/bash -c "$$(curl -fsSL https://raw.githubusercontent.com/sitdev/ddev/main/install.sh)" -- "${UPDATE_BRANCH}" 
 
-local-init: start install ## Initialize local WP database using basic defaults
+local-init: start ## Initialize local WP database using basic defaults
+	@ddev composer install -o --prefer-source
 	@ddev local-config
 	@make container-sync
 	@ddev local-init
