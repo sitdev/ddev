@@ -61,7 +61,6 @@ clean: ## Clean build
 
 reset: self-update ## Clean build and git hard reset/pull
 	@/bin/bash .ddev/commands/host/hard-reset
-	-@make container-sync
 
 update: start ## Composer update
 	@ddev platform-update

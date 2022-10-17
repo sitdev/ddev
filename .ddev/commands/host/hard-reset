@@ -8,3 +8,4 @@ git add -A .
 git reset --hard
 git fetch
 git pull
+ddev mutagen reset || true
