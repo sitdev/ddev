@@ -59,13 +59,9 @@ clean: ## Clean build
 	ddev mutagen reset || true; \
 	[ ! -z "$${isRunning}" ] && make start || true
 
-reset: clean ## Clean build and git hard reset/pull
-	@mv wp-content/uploads ./ && rm -rf wp-content && mkdir -p wp-content && mv uploads wp-content/
-	@git add -A .
-	@git reset --hard
-	@git fetch
-	@git pull
-	@make container-sync
+reset: self-update ## Clean build and git hard reset/pull
+	@/bin/bash .ddev/commands/host/hard-reset
+	-@make container-sync
 
 update: start ## Composer update
 	@ddev platform-update
