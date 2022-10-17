@@ -13,13 +13,12 @@ const DB_USER = 'db';
 const DB_PASSWORD = 'db';
 const DB_HOST = 'db';
 const ENVIRONMENT = 'local';
-const WP_HOME = '${DDEV_PRIMARY_URL}';
+const FORCE_HTTPS = true;
+
 EOT
 
 if [ ! -z "$(is_multisite)" ]; then
+  echo "const WP_HOME = '${DDEV_PRIMARY_URL}'";
   echo "const WP_SITEURL = '${DDEV_PRIMARY_URL}';" >> ${DDEV_APPROOT}/${DDEV_DOCROOT}/local-config.php
   echo "const DOMAIN_CURRENT_SITE = '${DDEV_SITENAME}.${DDEV_TLD}';" >> ${DDEV_APPROOT}/${DDEV_DOCROOT}/local-config.php
-else
-  echo "const WP_SITEURL = '${DDEV_PRIMARY_URL}/wp';" >> ${DDEV_APPROOT}/${DDEV_DOCROOT}/local-config.php
-  echo "const WP_CONTENT_URL = '${DDEV_PRIMARY_URL}/wp-content';" >> ${DDEV_APPROOT}/${DDEV_DOCROOT}/local-config.php
 fi
