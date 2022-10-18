@@ -1,0 +1,7 @@
+#!/bin/bash
+## Description: Search/replace in files or string. See https://www.npmjs.com/package/replace/
+## Usage: replace [search] [replacement] [location]
+## Example: Replace all occurrences of "foo" with "bar" in files in the current directory:\nddev replace 'foo' 'bar' *\n\nReplace in all files in a recursive search of the current directory:\nddev replace 'foo' 'bar' . -r\n\nReplace only in test/file1.js and test/file2.js:\nddev replace 'foo' 'bar' test/file1.js test/file2.js\n\nReplace all word pairs with "_" in middle with a "-":\nddev replace '(\w+)_(\w+)' '$1-$2' *\n\nReplace only in files with names matching *.js:\nddev replace 'foo' 'bar' . -r --include="*.js"\n\nDon't replace in files with names matching *.min.js and *.py:\nddev replace 'foo' 'bar' . -r --exclude="*.min.js,*.py"\n\nPreview the replacements without modifying any files:\nddev replace 'foo' 'bar' . -r --preview\n\nReplace using stdin:\necho "asd" | ddev replace "asd" "dsa" -z
+
+[ ! -z "$(which replace)" ] || yarn global add replace
+replace "$@"
