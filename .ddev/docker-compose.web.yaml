@@ -3,6 +3,8 @@
 version: '3.6'
 services:
   web:
+    # For arm processor
+    platform: linux/amd64
     expose:
       - '3000'
     environment:
