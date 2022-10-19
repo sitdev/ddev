@@ -2,21 +2,55 @@
 
 ## Description: Initialize a local WP database using standard defaults.
 
-#which replace &> /dev/null || yarn global add replace
+export NEWT_COLORS='
+root=white,black
+border=magenta,black
+window=white,black
+shadow=white,black
+title=white,black
+button=white,magenta
+actbutton=white,magenta
+checkbox=white,black
+actcheckbox=white,magenta
+entry=white,black
+label=white,black
+listbox=white,black
+actlistbox=white,magenta
+textbox=white,black
+acttextbox=white,magenta
+compactbutton=white,black
+actcompactbutton=white,magenta
+'
 
 read -p "sit-admin password: [test] " USER_PASS
 USER_PASS=${USER_PASS:-test}
-wp core install --url=${DDEV_PRIMARY_URL} --title="${SITE_TITLE}" --admin_user="sit-admin" --admin_email="developers@situationinteractive.com"
+wp core install --url=${DDEV_PRIMARY_URL} --title="${SITE_TITLE}" --admin_user="sit-admin" --admin_email="developers@situationinteractive.com" &> /dev/null
 wp user update sit-admin --user_pass=${USER_PASS}
 wp rewrite structure '/%postname%/'
 wp option update timezone_string "America/New_York"
-wp option delete blogdescription comments_notify default_comment_status default_ping_status default_pingback_flag comment_moderation moderation_notify comment_registration show_avatars close_comments_for_old_posts page_comments	
+wp option delete blogdescription comments_notify default_comment_status default_ping_status default_pingback_flag comment_moderation moderation_notify comment_registration show_avatars close_comments_for_old_posts page_comments
 wp post delete 1 --force
 wp post update 2 --post_content="" --post_title="Home" --post_name="home"
 wp option update show_on_front "page"
 wp option update page_on_front 2
 
-#read -p "Activate plugins? [yes/NO] " ACTIVATE_PLUGINS
-#ACTIVATE_PLUGINS=${ACTIVATE_PLUGINS:-no}
-wp plugin activate advanced-custom-fields-pro backstage classic-editor producers set-design soil vc-library js_composer wp-image wp-sync-db wp-sync-db-cli wp-sync-db-media-files --url=${DDEV_PRIMARY_URL}
-#wp plugin list --url=${DDEV_PRIMARY_URL}
+wp plugin activate wp-sync-db wp-sync-db-cli wp-sync-db-media-files --url=${DDEV_PRIMARY_URL}
+
+echo "Getting plugin list..."
+pluginList=$(wp plugin list --fields=name,title --format=csv --status=inactive --url=${DDEV_PRIMARY_URL})
+options=()
+count=0
+while IFS=',' read -a row; do
+  if [[ $count -gt 0 ]]; then
+    name="${row[0]}"
+    title=$(sed -e 's/"//g' <<<"${row[1]}")
+    options+=("${name}" "${title}" "OFF")
+  fi
+  ((count++))
+done <<<"${pluginList}"
+
+choices=$(whiptail --checklist "Activate plugins (Enter or Esc to continue)" 23 70 15 "${options[@]}" 3>&1 1>&2 2>&3)
+if [ ! -z "${choices}" ]; then
+  choices=$(sed -e 's/"//g' <<<"${choices}")
+  wp plugin activate ${choices} --url=${DDEV_PRIMARY_URL}
+fi

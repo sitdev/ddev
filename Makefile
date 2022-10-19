@@ -110,7 +110,7 @@ reset-docker: # Remove all docker images from system
 	-@docker rmi -f $(docker images -q)
 	-@docker system prune -af && docker volume prune
 
-factory-reset: clean reset-ddev reset-docker # Full project clean and global reset of ddev and docker. Mainly useful for testing or freeing up disk space.
+factory-reset: reset-ddev reset-docker # Full project clean and global reset of ddev and docker. Mainly useful for testing or freeing up disk space.
 
 help: ## Show this dialog
 	@printf "\nMakefile help documentation:\n\n"
