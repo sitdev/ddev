@@ -4,17 +4,20 @@
 ## Usage: run-migration [args]
 ## Example: "ddev run-migration pull-staging"
 
+set -e
+
 if [ -z $1 ]; then 
   wp wpsdb migrate --help --url=${DDEV_PRIMARY_URL}
-  ls .ddev/migrations | sed -e 's/\.json//' 
+  ls .conf/migrations | sed -e 's/\.yaml//' 
   exit
 fi
 
-FILE=".conf/migrations/${1}.json"
+FILE=".conf/migrations/${1}.yaml"
 
 if [ -f ${FILE} ]; then
-  echo "Importing Migration"
-  wp option update wpsdb_settings --url=${DDEV_PRIMARY_URL} --format=json < ${FILE}
+  echo "Importing Migration: ${FILE}"
+  option=$(yq -o=json "${FILE}")
+  wp option update wpsdb_settings "${option}" --format=json --url=${DDEV_PRIMARY_URL}
   wp plugin is-installed wp-sync-db-cli --url=${DDEV_PRIMARY_URL}
   installed=$?
   if [ $installed -eq '1' ]; then composer require wp-sync-db/wp-sync-db-cli:dev-master --dev; fi
@@ -36,5 +39,5 @@ if [ -f ${FILE} ]; then
   fi
 else
   echo "Migration ${1} not found."  
-  echo "Delete existing migrations, set up the new one, and run ddev export-migration."
+  echo "Delete existing migrations in the CMS, set up the new one, and run ddev export-migration."
 fi

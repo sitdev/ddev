@@ -40,7 +40,7 @@ stop: ## Shut down ddev
 
 restart: stop start ## Restart ddev
 
-shutdown: stop clean ## Clean build, full shutdown of ddev/colima
+shutdown: stop ## Clean build, full shutdown of ddev/colima
 	-@colima stop
 
 container-sync:

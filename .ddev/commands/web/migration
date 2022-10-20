@@ -1,0 +1,93 @@
+#!/bin/bash
+
+## Description: Migration menu
+## Usage: migration
+## Example: "ddev migration" or "ddev migration pull-staging" or "ddev migration export"
+
+# On load:
+# Check for all connection strings
+# construct migration profiles if files don't exist
+# Show action dialog
+
+set -e
+
+action=$1
+TEMP_FILE=~/connection-string.txt
+CONNECTIONS_FILE=.conf/.connections
+mkdir -p .conf/migrations
+LOCAL_DOMAIN=$(echo $DDEV_PRIMARY_URL | replace "https://" "" -z)
+
+if [[ "${action}" = "export" ]]; then
+  sh .ddev/commands/web/export-migration
+  exit
+fi
+
+buildProfiles() {
+  if [ -f $CONNECTIONS_FILE ]; then
+    while read p; do
+      IFS="|" read environment encodedConnectionString <<<"$p"
+      connectionString=$(bash ~/bin/decode "${encodedConnectionString}")
+      remoteDomain=$(echo "${connectionString}" | head -1 | replace "https://" "" -z | replace "/wp" "" -z)
+
+      if [ ! -f ".conf/migrations/pull-${environment}.yaml" ]; then
+        cp .ddev/migrations/pull-template.yaml ".conf/migrations/pull-${environment}.yaml"
+        yq ".profiles[0].connection_info = \"${connectionString}\"" -i ".conf/migrations/pull-${environment}.yaml" 
+        replace "{{remote-domain}}" "${remoteDomain}" ".conf/migrations/pull-${environment}.yaml" --silent
+        replace "{{local-domain}}" "${LOCAL_DOMAIN}" ".conf/migrations/pull-${environment}.yaml" --silent
+      fi
+      if [[ ! -f ".conf/migrations/push-${environment}.yaml" ]] && [[ ${environment} != "production" ]]; then
+        cp .ddev/migrations/push-template.yaml ".conf/migrations/push-${environment}.yaml"
+        yq ".profiles[0].connection_info = \"${connectionString}\"" -i ".conf/migrations/push-${environment}.yaml"
+        replace "{{remote-domain}}" "${remoteDomain}" ".conf/migrations/push-${environment}.yaml" --silent
+        replace "{{local-domain}}" "${LOCAL_DOMAIN}" ".conf/migrations/push-${environment}.yaml" --silent
+      fi
+    done <$CONNECTIONS_FILE
+  fi
+}
+registerConnection() {
+  touch $TEMP_FILE
+  connectionString=$(dialog --erase-on-exit --title "Enter Remote Connection String" --editbox $TEMP_FILE 23 70 3>&1 1>&2 2>&3)
+  envName=$(dialog --erase-on-exit --title "Environment Name" --inputbox "Name of environment? [staging|production|custom]" 23 70 staging 3>&1 1>&2 2>&3)
+  rm -f $TEMP_FILE
+  encoded=$(bash ~/bin/encode "${connectionString}")
+  if [[ ! -z "${connectionString}" ]] && [[ ! -z "${envName}" ]]; then
+    find .conf/migrations -type f -name "*-${envName}.yaml" -prune -exec rm -f {} \;
+    if [ -f $CONNECTIONS_FILE ]; then
+      cat $CONNECTIONS_FILE | grep -v "${envName}" >$CONNECTIONS_FILE
+    fi
+    echo "${envName}|${encoded}" >>$CONNECTIONS_FILE
+    git add $CONNECTIONS_FILE
+    buildProfiles
+  fi
+  showMenu
+}
+
+showMenu() {
+  options=()
+  existingMigrations=$(ls .conf/migrations | grep ".yaml" | sed -e 's/\.yaml//')
+  for item in $existingMigrations; do
+    label=$(cat .conf/migrations/${item}.yaml | grep "name" | replace "name:" "" -z | xargs)
+    options+=("${item}" "${label}")
+  done
+  options+=("register" "Add new remote connection string")
+  options+=("exit" "Exit Application")
+  choice=$(dialog --erase-on-exit --title "Migration Options" --menu "Choose an option:" 23 70 15 "${options[@]}" 3>&1 1>&2 2>&3)
+  if [ ! -z "${choice}" ]; then
+    if [[ "${choice}" = "register" ]]; then
+      registerConnection
+    elif [[ "${choice}" = "exit" ]]; then
+      exit
+    else
+      /bin/bash .ddev/commands/web/run-migration "${choice}"
+    fi
+  fi
+}
+buildProfiles
+showMenu
+
+# Actions:
+# List all found migrations (files)
+# Enter remote connection string
+#  - staging, production, or other (provide name)
+#  - Paste connection string
+#  - Return to main nav with new options loaded
