@@ -77,6 +77,9 @@ local-init: start ## Initialize local WP database using basic defaults
 	@ddev local-init
 	@ddev migration
 
+migration: ## Start Migration dialog to create new or run existing migrations
+	@ddev migration
+
 pull-staging: ## Run a pre-defined WP Migrate DB profile to pull the staging environment
 	@ddev run-migration pull-staging
 
