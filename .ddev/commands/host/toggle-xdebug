@@ -1,0 +1,5 @@
+#!/bin/bash
+
+## Description: Toggle Xdebug active state
+
+[ -z "$(ddev xdebug status | grep disabled)" ] && ddev xdebug off || ddev xdebug on 

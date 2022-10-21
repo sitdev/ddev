@@ -19,6 +19,7 @@ if [ ! -z "${INITIAL_RUN}" ]; then
   read -p "sit-admin password: [test] " USER_PASS
   USER_PASS=${USER_PASS:-test}
 fi
+composer update situation/scripts situation/backstage -o
 echo "Installing WP Core..."
 wp core install --url=${DDEV_PRIMARY_URL} --title="${SITE_TITLE}" --admin_user="sit-admin" --admin_email="developers@situationinteractive.com" &>/dev/null
 wp user update sit-admin --user_pass=${USER_PASS}

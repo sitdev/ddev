@@ -56,8 +56,8 @@ registerConnection() {
     echo "${envName}|${encoded}" >>$CONNECTIONS_FILE
     git add $CONNECTIONS_FILE
     buildProfiles
+    showMenu
   fi
-  showMenu
 }
 
 showMenu() {
@@ -72,11 +72,16 @@ showMenu() {
     options+=("${item}" "${label}")
   done
   options+=("register" "Add new remote connection string")
+  options+=("export" "Export existing migration")
   options+=("exit" "Exit Application")
   choice=$(dialog --erase-on-exit --title "Migration Options" --menu "Choose an option:" 23 70 15 "${options[@]}" 3>&1 1>&2 2>&3)
   if [ ! -z "${choice}" ]; then
     if [[ "${choice}" = "register" ]]; then
       registerConnection
+    elif [[ "${choice}" = "export" ]]; then
+      /bin/bash .ddev/commands/web/export-migration
+      showMenu
+      exit
     elif [[ "${choice}" = "exit" ]]; then
       exit
     else

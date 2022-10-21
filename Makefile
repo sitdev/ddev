@@ -96,10 +96,10 @@ mailhog: ## Launch mailhog in browser
 	@ddev launch -m
 
 sequelpro: ## Open current project database in Sequel Pro
-	@ddev sequelpro
+	@ddev sequelpro || ddev sequelace 
 
-xdebug: ## Start Xdebug
-	@ddev xdebug on
+xdebug: ## Toggle Xdebug (off by default)
+	@ddev toggle-xdebug
 
 running:
 	@[ ! -z "$$(ddev exec pwd 2>/dev/null)" ] || (echo "Run \"make\" or \"make start\" to start"; exit 1)
