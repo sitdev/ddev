@@ -1,4 +1,4 @@
-# {{SITE_NAME}} README#
+# {{SITE_TITLE}} README
 
 ## Getting Started: Local Environment
 
