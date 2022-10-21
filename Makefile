@@ -52,7 +52,7 @@ watch: ## Start the watch task
 	@ddev yarn-watch
 	
 logging: ## Tail the ddev log
-	@ddev logs -f
+	@ddev logs -f --tail 10
 
 clean: ## Clean build
 	@isRunning="$$(ddev exec pwd 2>/dev/null)"; \
