@@ -5,6 +5,7 @@ UPDATE_BRANCH="main"
 .PHONY: *
 
 all: develop
+	@ddev wp core is-installed &> /dev/null || make local-init
 	@printf "\nEnter \033[36mmake help\033[0m for more info\n\n"
 
 develop: start install build container-sync ## Turn on ddev and run build (default)
@@ -74,6 +75,7 @@ local-init: start ## Initialize local WP database using basic defaults
 	@ddev local-config
 	@make container-sync
 	@ddev local-init
+	@ddev migration
 
 pull-staging: ## Run a pre-defined WP Migrate DB profile to pull the staging environment
 	@ddev run-migration pull-staging

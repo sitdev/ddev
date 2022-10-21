@@ -9,8 +9,6 @@
 # construct migration profiles if files don't exist
 # Show action dialog
 
-set -e
-
 action=$1
 TEMP_FILE=~/connection-string.txt
 CONNECTIONS_FILE=.conf/.connections
@@ -65,6 +63,10 @@ registerConnection() {
 showMenu() {
   options=()
   existingMigrations=$(ls .conf/migrations | grep ".yaml" | sed -e 's/\.yaml//')
+  if [ -z "${existingMigrations}" ]; then
+    registerConnection
+    exit
+  fi
   for item in $existingMigrations; do
     label=$(cat .conf/migrations/${item}.yaml | grep "name" | replace "name:" "" -z | xargs)
     options+=("${item}" "${label}")

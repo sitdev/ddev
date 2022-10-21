@@ -4,8 +4,6 @@
 ## Usage: run-migration [args]
 ## Example: "ddev run-migration pull-staging"
 
-set -e
-
 if [ -z $1 ]; then 
   wp wpsdb migrate --help --url=${DDEV_PRIMARY_URL}
   ls .conf/migrations | sed -e 's/\.yaml//' 
@@ -15,27 +13,20 @@ fi
 FILE=".conf/migrations/${1}.yaml"
 
 if [ -f ${FILE} ]; then
-  echo "Importing Migration: ${FILE}"
+  echo "Importing migration from ${FILE}"
   option=$(yq -o=json "${FILE}")
   wp option update wpsdb_settings "${option}" --format=json --url=${DDEV_PRIMARY_URL}
-  wp plugin is-installed wp-sync-db-cli --url=${DDEV_PRIMARY_URL}
-  installed=$?
-  if [ $installed -eq '1' ]; then composer require wp-sync-db/wp-sync-db-cli:dev-master --dev; fi
-  wp plugin is-active wp-sync-db-cli --url=${DDEV_PRIMARY_URL}
-  active=$?
-  if [ $active -eq '1' ]; then wp plugin activate wp-sync-db-cli --url=${DDEV_PRIMARY_URL}; fi
-
-  echo "Running Migration..."
-  migrationProfile=$(wp option get wpsdb_settings)
-  isPull=$(echo "${migrationProfile}" | grep action | grep pull)
-  migrationName=$(echo "${migrationProfile}" | grep name)
-  echo "${migrationName}"
+  wp plugin is-installed wp-sync-db-cli --url=${DDEV_PRIMARY_URL} &> /dev/null || composer require wp-sync-db/wp-sync-db-cli:dev-master --dev
+  wp plugin is-active wp-sync-db-cli --url=${DDEV_PRIMARY_URL} &> /dev/null || wp plugin activate wp-sync-db-cli --url=${DDEV_PRIMARY_URL}
+  migrationName=$(yq '.profiles[0].name' "${FILE}")
+  echo "Running Migration: ${migrationName}"
+  direction=$(yq '.profiles[0].action' "${FILE}")
   wp wpsdb migrate 1 --url=${DDEV_PRIMARY_URL}
-  if [ ! -z "${isPull}" ]; then
+  if [[ "${direction}" = "pull" ]]; then
     wp plugin deactivate wp-rocket --url=${DDEV_PRIMARY_URL}
     wp plugin deactivate redis-cache --url=${DDEV_PRIMARY_URL}
-    git restore --staged wp-config.php
-    git restore wp-config.php
+    git restore --staged wp-config.php || true
+    git restore wp-config.php || true
   fi
 else
   echo "Migration ${1} not found."  

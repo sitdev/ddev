@@ -5,7 +5,6 @@
 ## Example: "ddev local-init" or "ddev local-init -i"
 ## Flags: [{"Shorthand":"i","Usage":"Expanded dialog to set password, set up options, activate plugins, etc."}]
 
-
 while getopts "i" option; do
   case "${option}" in
 
@@ -23,6 +22,7 @@ fi
 echo "Installing WP Core..."
 wp core install --url=${DDEV_PRIMARY_URL} --title="${SITE_TITLE}" --admin_user="sit-admin" --admin_email="developers@situationinteractive.com" &>/dev/null
 wp user update sit-admin --user_pass=${USER_PASS}
+echo "Set default password: ${USER_PASS}"
 wp rewrite structure '/%postname%/'
 if [ ! -z "${INITIAL_RUN}" ]; then
   wp option update timezone_string "America/New_York"
@@ -33,7 +33,7 @@ if [ ! -z "${INITIAL_RUN}" ]; then
   wp option update page_on_front 2
 fi
 
-wp plugin activate wp-sync-db wp-sync-db-cli wp-sync-db-media-files --url=${DDEV_PRIMARY_URL}
+wp plugin activate backstage wp-sync-db wp-sync-db-cli wp-sync-db-media-files --url=${DDEV_PRIMARY_URL}
 if [ ! -z "${INITIAL_RUN}" ]; then
   echo "Getting plugin list..."
   pluginList=$(wp plugin list --fields=name,title --format=csv --status=inactive --url=${DDEV_PRIMARY_URL})
