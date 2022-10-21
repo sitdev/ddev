@@ -21,5 +21,7 @@ fi
 source "${scriptRoot}/bin/build-ddev.sh"
 echo $revision > .ddev/.revision
 
-cp -r "${scriptRoot}/Makefile" ./
+cp "${scriptRoot}/Makefile" ./
+rm -f ./*.md
+cp "${scriptRoot}/default-readme.md" ./README.md
 git add -A .

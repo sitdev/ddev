@@ -1,12 +1,22 @@
-A DDEV setup for The Studio at Situation Group developers and freelancers.
+# {{SITE_NAME}} README#
 
-## Getting Started
+## Getting Started: Local Environment
 
-Inside your project repository/webroot, run the following:
+Clone the repository, and run:
 
 ```shell
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/sitdev/ddev/main/install.sh)"
+make
 ```
+
+This will:
+
+1. Spin up the docker container.
+2. Install all dependencies.
+3. Run the build process.
+4. Initialize local WP<span style="color:red">*</span>.
+5. Open a migration dialog to pull staging<span style="color:red">*</span>.
+
+<sup><span style="color:red">*</span> first run only</sup>
 
 ## Requirements
 
