@@ -3,9 +3,7 @@
 export scriptRoot=$(cd "${BASH_SOURCE%/*}" && pwd)
 revision=$(cd $scriptRoot && git rev-parse HEAD)
 [ -f .ddev/.revision ] && oldVer=$(cat .ddev/.revision) || true
-if [[ $revision != $oldVer ]]; then
-  echo "Update found..."
-fi
+
 source "${scriptRoot}/bin/check-dependencies.sh"
 source "${scriptRoot}/bin/create-settings.sh"
 if [ -d .git ]; then
@@ -20,8 +18,12 @@ if [ -d .git ]; then
 fi
 source "${scriptRoot}/bin/build-ddev.sh"
 echo $revision > .ddev/.revision
-
+if [[ $revision != $oldVer ]]; then
+  rm -f ./*.md
+  cp "${scriptRoot}/default-readme.md" ./README.md
+  touch .ddev/.revision-updated
+  echo "Update found..."
+fi
 cp "${scriptRoot}/Makefile" ./
-rm -f ./*.md
-cp "${scriptRoot}/default-readme.md" ./README.md
+
 git add -A .
