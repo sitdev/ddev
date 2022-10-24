@@ -46,7 +46,7 @@ shutdown: stop ## Clean build, full shutdown of ddev/colima
 
 container-sync:
 	@echo "Syncing mutagen container..."
-	@ddev mutagen sync 2> /dev/null || ddev mutagen reset || true
+	@make running &> /dev/null && ddev mutagen sync || ddev mutagen reset
 
 watch: ## Start the watch task
 	@ddev yarn-watch
