@@ -54,4 +54,5 @@ if [ ! -z "${INITIAL_RUN}" ]; then
     choices=$(sed -e 's/"//g' <<<"${choices}")
     wp plugin activate ${choices} --url=${DDEV_PRIMARY_URL}
   fi
+  echo "Login at ${DDEV_PRIMARY_URL}/wp/wp-admin/ with sit-admin / ${USER_PASS}"
 fi
