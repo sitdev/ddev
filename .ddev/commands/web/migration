@@ -25,7 +25,11 @@ buildProfiles() {
     while read p; do
       IFS="|" read environment encodedConnectionString <<<"$p"
       connectionString=$(bash ~/bin/decode "${encodedConnectionString}")
-      remoteDomain=$(echo "${connectionString}" | head -1 | replace "https://" "" -z | replace "/wp" "" -z)
+      echo "${connectionString}" | head -1 > $TEMP_FILE
+      replace "https://" "" $TEMP_FILE --silent
+      replace "/wp" "" $TEMP_FILE --silent
+      remoteDomain=$(cat $TEMP_FILE)
+      rm -f $TEMP_FILE
 
       if [ ! -f ".conf/migrations/pull-${environment}.yaml" ]; then
         cp .ddev/migrations/pull-template.yaml ".conf/migrations/pull-${environment}.yaml"
@@ -91,10 +95,3 @@ showMenu() {
 }
 buildProfiles
 showMenu
-
-# Actions:
-# List all found migrations (files)
-# Enter remote connection string
-#  - staging, production, or other (provide name)
-#  - Paste connection string
-#  - Return to main nav with new options loaded
