@@ -52,7 +52,7 @@ watch: ## Start the watch task
 	@ddev yarn-watch
 	
 logging: ## Tail the ddev log
-	@ddev logs -f --tail 10
+	@ddev logs -f --tail 10 | grep --line-buffered "proxy_fcgi:error" | sed -u 's/.*client//' | sed -u 's/^.*] //'
 
 clean: ## Clean build
 	@isRunning="$$(ddev exec pwd 2>/dev/null)"; \
