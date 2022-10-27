@@ -55,9 +55,10 @@ registerConnection() {
   if [[ ! -z "${connectionString}" ]] && [[ ! -z "${envName}" ]]; then
     find .conf/migrations -type f -name "*-${envName}.yaml" -prune -exec rm -f {} \;
     if [ -f $CONNECTIONS_FILE ]; then
-      cat $CONNECTIONS_FILE | grep -v "${envName}" >$CONNECTIONS_FILE
+      cat $CONNECTIONS_FILE | grep -v "${envName}" >$CONNECTIONS_FILE.temp
+      mv $CONNECTIONS_FILE.temp $CONNECTIONS_FILE
     fi
-    echo "${envName}|${encoded}" >>$CONNECTIONS_FILE
+    printf "${envName}|${encoded}\n" >>$CONNECTIONS_FILE
     git add $CONNECTIONS_FILE
     buildProfiles
     showMenu
