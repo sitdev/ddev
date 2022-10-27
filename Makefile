@@ -112,8 +112,7 @@ reset-ddev: # Remove all projects from DDEV project list, remove ddev docker ima
 	-@ddev clean --all
 
 reset-docker: # Remove all docker images from system
-	-@docker rmi -f $(docker images -q)
-	-@docker system prune -af && docker volume prune
+	-@docker system prune -a --volumes
 
 factory-reset: reset-ddev reset-docker # Full project clean and global reset of ddev and docker. Mainly useful for testing or freeing up disk space.
 
