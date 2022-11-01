@@ -19,11 +19,9 @@ fi
 source "${scriptRoot}/bin/build-ddev.sh"
 echo $revision > .ddev/.revision
 if [[ $revision != $oldVer ]]; then
-  rm -f ./*.md
   cp "${scriptRoot}/default-readme.md" ./README.md
-  touch .ddev/.revision-updated
+  ddev exec pwd 2>/dev/null && ddev replace "{{SITE_TITLE}}" "${SITE_TITLE}" ./README.md --silent || true
   echo "Update found..."
-  ddev mutagen reset || true
 fi
 cp "${scriptRoot}/Makefile" ./
 
