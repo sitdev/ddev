@@ -1,0 +1,75 @@
+#!/bin/bash
+
+echo "Be sure your local environment is freshly pulled from production. If not, please exit now and run the migration."
+echo ""
+baseDir="$(pwd)"
+read -p "Enter domain to replace ${DDEV_SITENAME}.${DDEV_TLD} in the database (enter to keep): " newDomain
+read -p "Enter location to save the export: [~/Downloads/${DDEV_SITENAME}/] " exportLocation
+read -p "Include full WP core?: [y/N] " includeCoreResp
+if [[ $includeCoreResp = "y" ]]; then
+  includeCore=1
+fi
+#make production
+exportLocation=${exportLocation:-../${DDEV_SITENAME}}
+rm -rf "${exportLocation}"
+mkdir -p "${exportLocation}"
+cd "${exportLocation}"
+exportLocation="$(pwd)"
+if [ ! -z "${includeCore}" ]; then
+  echo "Downloading WordPress core..."
+  wget -q https://wordpress.org/latest.zip
+  unzip -q latest.zip
+  rm -f latest.zip
+  mv wordpress httpdocs
+  rm -rf httpdocs/wp-content
+fi
+mkdir -p httpdocs/wp-content
+cd httpdocs/wp-content
+[ -d "${baseDir}/wp-content/mu-plugins" ] && cp -r "${baseDir}/wp-content/mu-plugins" ./
+[ -d "${baseDir}/wp-content/plugins" ] && cp -r "${baseDir}/wp-content/plugins" ./
+[ -d "${baseDir}/wp-content/themes" ] && cp -r "${baseDir}/wp-content/themes" ./
+[ -d "${baseDir}/wp-content/uploads" ] && cp -r "${baseDir}/wp-content/uploads" ./
+[ -d "${baseDir}/wp-content/vendor" ] && cp -r "${baseDir}/wp-content/vendor" ./
+mkdir -p mu-plugins
+cat <<EOT >./mu-plugins/constants.php
+<?php
+
+// ==============================
+// Composer autoloader if present
+// ==============================
+if (file_exists(dirname(__DIR__) . '/vendor/autoload.php')) {
+    define('USE_COMPOSER_AUTOLOADER', true);
+    require_once dirname(__DIR__) . '/vendor/autoload.php';
+}
+const ENVIRONMENT = 'production';
+const GF_LICENSE_KEY = '';
+const VIDEO_PRODUCER_VIMEO_CLIENT_ID = '';
+const VIDEO_PRODUCER_VIMEO_CLIENT_SECRET = '';
+const VIDEO_PRODUCER_VIMEO_ACCESS_TOKEN = '';
+const VIDEO_PRODUCER_YOUTUBE_API_KEY = '';
+EOT
+
+cd vendor/situation/scripts
+rm -rf composer.json cypress deploy docker percy src
+cd "${exportLocation}"
+find * -type d -name "node_modules" -prune -exec rm -rf {} \;
+find * -type d -name "bower_components" -prune -exec rm -rf {} \;
+find * -type d -name ".git*" -prune -exec rm -rf {} \;
+find * -type f -name ".gitignore" -exec rm -rf {} \;
+cd httpdocs
+[ -f "${baseDir}/package.json" ] && cat "${baseDir}/package.json" | grep -v "test\|cypress\|percy" >./package.json
+[ -f "${baseDir}/yarn.lock" ] && cp -r "${baseDir}/yarn.lock" ./
+[ -f "${baseDir}/webpack.config.js" ] && cp -r "${baseDir}/webpack.config.js" ./
+
+cd "$baseDir"
+ddev export-db --gzip=false --file="${exportLocation}/db-backup.sql"
+echo "Doing search/replace..."
+ddev wp search-replace "${DDEV_SITENAME}.${DDEV_TLD}/wp" "${DDEV_SITENAME}.${DDEV_TLD}"
+ddev wp search-replace "${DDEV_SITENAME}.${DDEV_TLD}-c" "${DDEV_SITENAME}.${DDEV_TLD}/wp-c"
+
+if [ ! -z "${newDomain}" ]; then
+  ddev wp search-replace "${DDEV_SITENAME}.${DDEV_TLD}" "${newDomain}"
+fi
+ddev export-db --gzip=false --file="${exportLocation}/db-export.sql"
+ddev import-db --src="${exportLocation}/db-backup.sql"
+rm -f "${exportLocation}/db-backup.sql"
