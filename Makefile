@@ -31,7 +31,7 @@ start: ## Turn on ddev
 		if ddev list | grep -q running; then \
 		  ddev poweroff; \
 		fi; \
-		make self-update
+		make self-update; \
 		ddev start && ddev auth ssh && make status; \
 	fi
 	
