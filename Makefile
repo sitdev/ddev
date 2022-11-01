@@ -27,11 +27,11 @@ build-production:
 
 start: ## Turn on ddev
 	@docker stats --no-stream &> /dev/null || colima start
-	@[ -d .ddev ] || make self-update
 	@if [ ! -z "$$(make running 2>/dev/null)" ]; then \
 		if ddev list | grep -q running; then \
 		  ddev poweroff; \
 		fi; \
+		make self-update
 		ddev start && ddev auth ssh && make status; \
 	fi
 	
