@@ -23,6 +23,7 @@ if [[ $revision != $oldVer ]]; then
   cp "${scriptRoot}/default-readme.md" ./README.md
   touch .ddev/.revision-updated
   echo "Update found..."
+  ddev mutagen reset || true
 fi
 cp "${scriptRoot}/Makefile" ./
 
