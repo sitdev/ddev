@@ -35,7 +35,6 @@ start: ## Turn on ddev
 		ddev start && ddev auth ssh && make status; \
 	fi
 	
-
 stop: ## Shut down ddev
 	-@ddev poweroff
 
@@ -107,14 +106,14 @@ running:
 remove-project: ## Remove project from DDEV project list. Local db is deleted, files are not
 	-@ddev delete -O
 
-reset-ddev: # Remove all projects from DDEV project list, remove ddev docker images from cache
-	-@ddev delete --all -O
+system-reset-ddev: # Remove all projects from DDEV project list, remove ddev docker images from cache
+	-@ddev delete --all --yes -O
 	-@ddev clean --all
 
-reset-docker: # Remove all docker images from system
+system-reset-docker: # Remove all docker images from system
 	-@docker system prune -a --volumes
 
-factory-reset: reset-ddev reset-docker # Full project clean and global reset of ddev and docker. Mainly useful for testing or freeing up disk space.
+system-factory-reset: system-reset-ddev system-reset-docker # Full project clean and global reset of ddev and docker. Mainly useful for testing or freeing up disk space.
 
 help: ## Show this dialog
 	@printf "\nMakefile help documentation:\n\n"
