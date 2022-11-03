@@ -8,11 +8,12 @@ echo "${updates}"
 if [[ "$updates" != *"Nothing to modify in lock file"* ]]; then
   ddev composer install -o --prefer-source
 fi
+ddev yarn-upgrade
 
-if [[ "$updates" == *"set-design"* ]] || [[ "$updates" == *"vc-library"* ]] || [[ "$updates" == *"situation/scripts"* ]] || [[ "$updates" == *"quiz-builder"* ]]; then
-  touch .ddev/.updated
-  echo "Found platform updates, rebuilding yarn cache..."
-  ddev yarn-install
-  rm -f .ddev/.updated
-  ddev mutagen sync
-fi
+#if [[ "$updates" == *"set-design"* ]] || [[ "$updates" == *"vc-library"* ]] || [[ "$updates" == *"situation/scripts"* ]] || [[ "$updates" == *"quiz-builder"* ]]; then
+#  touch .ddev/.updated
+#  echo "Found platform updates, rebuilding yarn cache..."
+#  ddev yarn-install
+#  rm -f .ddev/.updated
+#  ddev mutagen sync
+#fi
