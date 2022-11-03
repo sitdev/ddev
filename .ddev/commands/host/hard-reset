@@ -8,4 +8,6 @@ git add -A .
 git reset --hard
 git fetch
 git pull
+git gc
+git prune
 ddev mutagen reset || true
