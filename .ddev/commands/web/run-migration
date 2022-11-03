@@ -30,8 +30,8 @@ if [ -f ${FILE} ]; then
   echo "Running Migration: ${migrationName}"
   wp wpsdb migrate 1 --url=${DDEV_PRIMARY_URL}
   if [[ "${direction}" = "pull" ]]; then
-    wp plugin deactivate wp-rocket --url=${DDEV_PRIMARY_URL}
-    wp plugin deactivate redis-cache --url=${DDEV_PRIMARY_URL}
+    wp plugin deactivate wp-rocket --url=${DDEV_PRIMARY_URL} &> /dev/null || true
+    wp plugin deactivate redis-cache --url=${DDEV_PRIMARY_URL} &> /dev/null || true
     git restore --staged wp-config.php || true
     git restore wp-config.php || true
   fi
