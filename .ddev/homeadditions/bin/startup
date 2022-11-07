@@ -7,6 +7,7 @@
     nvm install ${useNodeVer} || true
   fi
   nvm use $useNodeVer
+  nvm alias default $useNodeVer
   yarn config set cache-folder /mnt/ddev-global-cache/yarn || yarn config set cacheFolder /mnt/ddev-global-cache/yarn || true
   npm config set cache /mnt/ddev-global-cache/npm || true
   [ -z "$(which replace)" ] && yarn global add replace || true
