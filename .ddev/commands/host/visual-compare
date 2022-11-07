@@ -1,0 +1,66 @@
+#!/bin/bash
+
+## Description: Update composer dependencies and rebuild yarn cache if needed.
+
+source .conf/settings
+baseDir="$(pwd)"
+targetDir=.conf/migrations/compare
+
+ddev ssh -- <<EOF
+mkdir -p $targetDir
+cd $targetDir
+cat <<EOT >package.json
+{
+    "name": "percy-test",
+    "version": "1.0.0",
+    "license": "MIT",
+    "scripts": {
+        "build-sitemap": "situation-percy --dry-run"
+    },
+    "devDependencies": {
+        "@situation/percy": "file:../../../wp-content/vendor/situation/scripts/percy"
+    }
+}
+EOT
+nvm install 12 &> /dev/null
+nvm use 12 &> /dev/null
+yarn
+cat <<EOT >percy.config.json
+{
+    "url": "${DDEV_PRIMARY_URL}"
+}
+EOT
+if [ ! -f percy-sitemap.json ]; then
+  yarn build-sitemap
+fi
+if [ ! -f local-domain.txt ]; then
+  echo "${DDEV_PRIMARY_URL}" > local-domain.txt
+fi
+EOF
+
+ddev ssh -- <<EOF
+cd $targetDir
+yq -P percy-sitemap.json | sed -e 's/\- //' > sitemap.txt
+nvm use $NODE_VER &> /dev/null
+EOF
+ddev mutagen sync
+cd $targetDir
+localDomain=$(cat local-domain.txt)
+[ -f remote-domain.txt ] && remoteDomain=$(cat remote-domain.txt) || true
+read -p "Enter remote domain: [${remoteDomain}] " newRemoteDomain
+remoteDomain=${newRemoteDomain:-${remoteDomain}}
+remoteDomain=$(echo "${remoteDomain}" | sed 's:/*$::')
+echo "${remoteDomain}" >remote-domain.txt
+if [ -z "${remoteDomain}" ]; then
+  exit
+fi
+while read path; do
+  echo "Testing: ${path}"
+  echo "(q to quit, enter to continue)"
+  read -u 3 input
+  if [[ $input =~ ^[Qq]$ ]]; then
+    exit
+  fi
+  open "${localDomain}${path}"
+  open "${remoteDomain}${path}"
+done 3<&0 <sitemap.txt
