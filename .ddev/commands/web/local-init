@@ -5,6 +5,10 @@
 ## Example: "ddev local-init" or "ddev local-init -i"
 ## Flags: [{"Shorthand":"i","Usage":"Expanded dialog to set password, set up options, activate plugins, etc."}]
 
+is_multisite() {
+  cat wp-config.php | grep WP_ALLOW_MULTISITE | grep true
+}
+
 while getopts "i" option; do
   case "${option}" in
 
@@ -21,7 +25,15 @@ if [ ! -z "${INITIAL_RUN}" ]; then
 fi
 composer update situation/scripts situation/backstage -o
 echo "Installing WP Core..."
-wp core install --url=${DDEV_PRIMARY_URL} --title="${SITE_TITLE}" --admin_user="sit-admin" --admin_email="developers@situationinteractive.com" &>/dev/null
+if [ ! -z "$(is_multisite)" ]; then
+  wp core multisite-install --skip-config --url=${DDEV_PRIMARY_URL} --title="${SITE_TITLE}" --admin_user="sit-admin" --admin_email="developers@situationinteractive.com" &>/dev/null
+  echo "const WP_HOME = '${DDEV_PRIMARY_URL}';" >>./local-config.php
+  echo "const WP_SITEURL = '${DDEV_PRIMARY_URL}';" >>./local-config.php
+  echo "const DOMAIN_CURRENT_SITE = '${DDEV_SITENAME}.${DDEV_TLD}';" >>./local-config.php
+  [ -f htaccess-multisite ] && cp htaccess-multisite .htaccess
+else
+  wp core install --url=${DDEV_PRIMARY_URL} --title="${SITE_TITLE}" --admin_user="sit-admin" --admin_email="developers@situationinteractive.com" &>/dev/null
+fi
 wp user update sit-admin --user_pass=${USER_PASS}
 echo "Set default password: ${USER_PASS}"
 wp rewrite structure '/%postname%/'
@@ -33,8 +45,12 @@ if [ ! -z "${INITIAL_RUN}" ]; then
   wp option update show_on_front "page"
   wp option update page_on_front 2
 fi
+if [ ! -z "$(is_multisite)" ]; then
+  wp plugin activate backstage wp-sync-db wp-sync-db-cli wp-sync-db-media-files --url=${DDEV_PRIMARY_URL} --network
+else
+  wp plugin activate backstage wp-sync-db wp-sync-db-cli wp-sync-db-media-files --url=${DDEV_PRIMARY_URL}
+fi
 
-wp plugin activate backstage wp-sync-db wp-sync-db-cli wp-sync-db-media-files --url=${DDEV_PRIMARY_URL}
 if [ ! -z "${INITIAL_RUN}" ]; then
   echo "Getting plugin list..."
   pluginList=$(wp plugin list --fields=name,title --format=csv --status=inactive --url=${DDEV_PRIMARY_URL})

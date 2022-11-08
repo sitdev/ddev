@@ -2,10 +2,6 @@
 
 ## Description: Create the ddev local-config.php file.
 
-is_multisite() {
-  cat wp-config.php | grep WP_ALLOW_MULTISITE | grep true
-}
-
 cat <<EOT > ${DDEV_APPROOT}/${DDEV_DOCROOT}/local-config.php
 <?php
 const DB_NAME = 'db';
@@ -16,9 +12,3 @@ const ENVIRONMENT = 'local';
 const FORCE_HTTPS = true;
 
 EOT
-
-if [ ! -z "$(is_multisite)" ]; then
-  echo "const WP_HOME = '${DDEV_PRIMARY_URL}'";
-  echo "const WP_SITEURL = '${DDEV_PRIMARY_URL}';" >> ${DDEV_APPROOT}/${DDEV_DOCROOT}/local-config.php
-  echo "const DOMAIN_CURRENT_SITE = '${DDEV_SITENAME}.${DDEV_TLD}';" >> ${DDEV_APPROOT}/${DDEV_DOCROOT}/local-config.php
-fi
