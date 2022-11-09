@@ -30,6 +30,8 @@ if [ ! -z "$(is_multisite)" ]; then
   echo "const WP_HOME = '${DDEV_PRIMARY_URL}';" >>./local-config.php
   echo "const WP_SITEURL = '${DDEV_PRIMARY_URL}';" >>./local-config.php
   echo "const DOMAIN_CURRENT_SITE = '${DDEV_SITENAME}.${DDEV_TLD}';" >>./local-config.php
+  [ -f wp-content/sunrise.php ] && echo "const SUNRISE = true;" >>./local-config.php
+  [[ "${DDEV_SITENAME}" = "admin.baa" ]] && echo "const COOKIE_DOMAIN = 'baa.test';" >>./local-config.php
   [ -f htaccess-multisite ] && cp htaccess-multisite .htaccess
 else
   wp core install --url=${DDEV_PRIMARY_URL} --title="${SITE_TITLE}" --admin_user="sit-admin" --admin_email="developers@situationinteractive.com" &>/dev/null
