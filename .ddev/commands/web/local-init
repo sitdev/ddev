@@ -23,7 +23,7 @@ if [ ! -z "${INITIAL_RUN}" ]; then
   read -p "sit-admin password: [test] " USER_PASS
   USER_PASS=${USER_PASS:-test}
 fi
-composer update situation/scripts situation/backstage -o
+composer update situation/scripts situation/backstage -o &> /dev/null
 echo "Installing WP Core..."
 if [ ! -z "$(is_multisite)" ]; then
   wp core multisite-install --skip-config --url=${DDEV_PRIMARY_URL} --title="${SITE_TITLE}" --admin_user="sit-admin" --admin_email="developers@situationinteractive.com" &>/dev/null
