@@ -26,6 +26,12 @@ if [ -f ${FILE} ]; then
   wp option update wpsdb_settings "${option}" --format=json --url=${DDEV_PRIMARY_URL}
   wp plugin is-installed wp-sync-db-cli --url=${DDEV_PRIMARY_URL} &>/dev/null || composer require wp-sync-db/wp-sync-db-cli:dev-master --dev
   wp plugin is-active wp-sync-db-cli --url=${DDEV_PRIMARY_URL} &>/dev/null || wp plugin activate wp-sync-db-cli --url=${DDEV_PRIMARY_URL}
+  if [ -z "$(grep situation/wp-sync-db-media-files composer.json)" ]; then
+    composer remove wp-sync-db/wp-sync-db-media-files
+    composer require situation/wp-sync-db-media-files:dev-master -o
+  else
+    composer update situation/wp-sync-db-media-files
+  fi
   migrationName=$(yq '.profiles[0].name' "${FILE}")
   echo "Running Migration: ${migrationName}"
   wp wpsdb migrate 1 --url=${DDEV_PRIMARY_URL}
