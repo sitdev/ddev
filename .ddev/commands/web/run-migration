@@ -27,10 +27,9 @@ if [ -f ${FILE} ]; then
   wp plugin is-installed wp-sync-db-cli --url=${DDEV_PRIMARY_URL} &>/dev/null || composer require wp-sync-db/wp-sync-db-cli:dev-master --dev
   wp plugin is-active wp-sync-db-cli --url=${DDEV_PRIMARY_URL} &>/dev/null || wp plugin activate wp-sync-db-cli --url=${DDEV_PRIMARY_URL}
   if [ -z "$(grep situation/wp-sync-db-media-files composer.json)" ]; then
-    composer remove wp-sync-db/wp-sync-db-media-files
-    composer require situation/wp-sync-db-media-files:dev-master -o
-  else
-    composer update situation/wp-sync-db-media-files
+    composer remove wp-sync-db/wp-sync-db-media-files &> /dev/null
+    composer require situation/wp-sync-db-media-files:dev-master -o &> /dev/null
+    composer update situation/backstage &> /dev/null
   fi
   migrationName=$(yq '.profiles[0].name' "${FILE}")
   echo "Running Migration: ${migrationName}"
