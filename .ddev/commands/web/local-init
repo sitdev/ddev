@@ -47,9 +47,9 @@ else
 fi
 wp user update sit-admin --user_pass=${USER_PASS}
 echo "Set default password: ${USER_PASS}"
-wp rewrite structure '/%postname%/'
+wp rewrite structure '/%postname%/' --hard --url=${DDEV_PRIMARY_URL} 
 # generates .htaccess file (non-multisite)
-wp rewrite flush --hard
+wp rewrite flush --hard --url=${DDEV_PRIMARY_URL} 
 if [ ! -z "${INITIAL_RUN}" ]; then
   wp option update timezone_string "America/New_York"
   wp option delete blogdescription comments_notify default_comment_status default_ping_status default_pingback_flag comment_moderation moderation_notify comment_registration show_avatars close_comments_for_old_posts page_comments
