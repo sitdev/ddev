@@ -107,7 +107,7 @@ remove-project: ## Remove project from DDEV project list. Local db is deleted, f
 	-@ddev delete -O
 
 system-reset-ddev: # Remove all projects from DDEV project list, remove ddev docker images from cache
-	-@ddev delete --all --yes -O
+	-@ddev delete --all -O
 	-@ddev clean --all
 
 system-reset-docker: # Remove all docker images from system
