@@ -23,33 +23,34 @@ if [ ! -z "${INITIAL_RUN}" ]; then
   read -p "sit-admin password: [test] " USER_PASS
   USER_PASS=${USER_PASS:-test}
 fi
-composer update situation/scripts situation/backstage -o &> /dev/null
+composer update situation/scripts situation/backstage -o &>/dev/null
 echo "Installing WP Core..."
 if [ ! -z "$(is_multisite)" ]; then
   wp core multisite-install --skip-config --url=${DDEV_PRIMARY_URL} --title="${SITE_TITLE}" --admin_user="sit-admin" --admin_email="developers@situationinteractive.com" &>/dev/null
   echo "const DOMAIN_CURRENT_SITE = '${DDEV_SITENAME}.${DDEV_TLD}';" >>./local-config.php
   [ -f wp-content/sunrise.php ] && echo "const SUNRISE = true;" >>./local-config.php
   [[ "${DDEV_SITENAME}" = "admin.baa" ]] && echo "const COOKIE_DOMAIN = 'baa.test';" >>./local-config.php
-  cat > .htaccess <<- EOM
+  cat >.htaccess <<-EOM
 RewriteEngine On
 RewriteBase /
 RewriteRule ^index\.php$ - [L]
-RewriteRule ^([_0-9a-zA-Z-]+/)?wp-admin$ $1wp-admin/ [R=301,L]
+RewriteRule ^([_0-9a-zA-Z-]+/)?wp-admin$ \$1wp-admin/ [R=301,L]
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]
-RewriteRule ^([_0-9a-zA-Z-]+/)?(wp-(content|admin|includes).*) wp/$2 [L]
-RewriteRule ^([_0-9a-zA-Z-]+/)?(.*\.php)$ wp/$2 [L]
+RewriteRule ^([_0-9a-zA-Z-]+/)?(wp-(content|admin|includes).*) wp/\$2 [L]
+RewriteRule ^([_0-9a-zA-Z-]+/)?(.*\.php)$ wp/\$2 [L]
 RewriteRule . index.php [L]
 EOM
+  wp rewrite structure '/%postname%/' --url=${DDEV_PRIMARY_URL}
+  wp rewrite flush --url=${DDEV_PRIMARY_URL}
 else
   wp core install --url=${DDEV_PRIMARY_URL} --title="${SITE_TITLE}" --admin_user="sit-admin" --admin_email="developers@situationinteractive.com" &>/dev/null
+  wp rewrite structure '/%postname%/' --url=${DDEV_PRIMARY_URL}
+  wp rewrite flush --hard --url=${DDEV_PRIMARY_URL}
 fi
 wp user update sit-admin --user_pass=${USER_PASS}
 echo "Set default password: ${USER_PASS}"
-wp rewrite structure '/%postname%/' --hard --url=${DDEV_PRIMARY_URL} 
-# generates .htaccess file (non-multisite)
-wp rewrite flush --hard --url=${DDEV_PRIMARY_URL} 
 if [ ! -z "${INITIAL_RUN}" ]; then
   wp option update timezone_string "America/New_York"
   wp option delete blogdescription comments_notify default_comment_status default_ping_status default_pingback_flag comment_moderation moderation_notify comment_registration show_avatars close_comments_for_old_posts page_comments
