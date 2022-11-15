@@ -37,8 +37,8 @@ if [ -f ${FILE} ]; then
   if [[ "${direction}" = "pull" ]]; then
     wp plugin deactivate wp-rocket --url=${DDEV_PRIMARY_URL} &> /dev/null || true
     wp plugin deactivate redis-cache --url=${DDEV_PRIMARY_URL} &> /dev/null || true
-    git restore --staged wp-config.php || true
-    git restore wp-config.php || true
+    git restore --staged wp-config.php &> /dev/null || true
+    git restore wp-config.php &> /dev/null || true
   fi
 else
   echo "Migration ${1} not found."
