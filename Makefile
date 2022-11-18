@@ -56,7 +56,6 @@ logging: ## Tail the ddev log
 clean: ## Clean build
 	@isRunning="$$(ddev exec pwd 2>/dev/null)"; \
 	/bin/bash .ddev/commands/host/clean-build; \
-	ddev mutagen reset || true; \
 	[ ! -z "$${isRunning}" ] && make start || true
 
 reset: self-update ## Clean build and git hard reset/pull
