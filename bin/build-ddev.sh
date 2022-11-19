@@ -1,9 +1,9 @@
 #!/bin/bash
-
+[ -f .ddev/.plugin-dev-mode ] && pluginDevMode=1 || true
 rm -rf .ddev
 git add -A .
 cp -r "${scriptRoot}/.ddev" ./
-
+[ -z "${pluginDevMode}" ] || touch .ddev/.plugin-dev-mode
 cat <<EOT > .ddev/config.local.yaml
 name: ${SITE_NAME}
 web_environment:
