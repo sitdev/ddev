@@ -1,0 +1,6 @@
+#!/bin/bash
+
+## Description: Composer install
+
+[ -f .ddev/.plugin-dev-mode ] && flag="--prefer-source" || true
+ddev composer install -o $flag

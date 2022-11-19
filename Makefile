@@ -12,7 +12,7 @@ develop: start install build container-sync ## Turn on ddev and run build (defau
 production: start install-production build-production container-sync ## Create the production build
 
 install: ## Install all dev dependencies
-	@ddev composer install -o --prefer-source
+	@ddev composer-install
 	@ddev yarn-install
 
 install-production:
@@ -69,7 +69,7 @@ self-update: ## Update Situation ddev config from remote repository. Branch is d
 	@[ -z ${UPDATE_BRANCH} ] || /bin/bash -c "$$(curl -fsSL https://raw.githubusercontent.com/sitdev/ddev/main/install.sh)" -- "${UPDATE_BRANCH}" 
 
 local-init: start ## Initialize local WP database using basic defaults
-	@ddev composer install -o --prefer-source
+	@ddev composer-install
 	@ddev local-config
 	@make container-sync
 	@ddev local-init
