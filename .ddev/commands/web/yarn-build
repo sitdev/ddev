@@ -15,6 +15,7 @@ export isProduction=$([[ ${1} == "production" ]] && echo '1')
 
 export scriptRoot=$(cd "${BASH_SOURCE%/*}" && pwd)
 source $scriptRoot/.utilities
+source $scriptRoot/yarn-lint
 
 if [ ! -z "${SOFT_RESET}" ]; then
   find * -type d -path "**/node_modules/*situation*" -prune -exec rm -rf {} \;

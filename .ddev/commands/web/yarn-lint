@@ -1,0 +1,32 @@
+#!/bin/bash
+
+## Description: Run the yarn/webpack/gulp build.
+
+# currentDirectory
+# themesDirectory
+# pluginsDirectory
+# childThemes
+# SITE_NAME
+# SITE_TITLE
+# NODE_VER
+
+export scriptRoot=$(cd "${BASH_SOURCE%/*}" && pwd)
+source $scriptRoot/.utilities
+
+addLintScript() {
+  if [[ $(jq '.scripts.lint | length' package.json) = 0 ]]; then
+    jq --indent 4 '.scripts.lint |= "eslint --fix --ext .js $npm_package_theme_directory/assets/scripts"' package.json >package.json.tmp && mv package.json.tmp package.json
+  fi
+}
+
+for buildDir in $buildDirs; do
+  cd ${buildDir}
+  if [ -f package.json ]; then
+    if [ -f webpack.config.js ]; then
+      addLintScript
+      yarn lint
+    fi
+  fi
+done
+
+cd "${currentDirectory}"
