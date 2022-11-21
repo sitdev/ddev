@@ -8,9 +8,7 @@ echo "${updates}"
 if [[ "$updates" != *"Nothing to modify in lock file"* ]]; then
   ddev composer-install
 fi
-if [[ "${NODE_VER}" != '10' ]]; then
-  ddev yarn-upgrade
-elif [[ "$updates" == *"set-design"* ]] || [[ "$updates" == *"vc-library"* ]] || [[ "$updates" == *"situation/scripts"* ]] || [[ "$updates" == *"quiz-builder"* ]]; then
+if [[ "$updates" == *"set-design"* ]] || [[ "$updates" == *"vc-library"* ]] || [[ "$updates" == *"situation/scripts"* ]] || [[ "$updates" == *"quiz-builder"* ]]; then
   touch .ddev/.updated
   echo "Found platform updates, rebuilding yarn cache..."
   ddev yarn-install
