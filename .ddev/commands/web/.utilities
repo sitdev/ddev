@@ -4,6 +4,10 @@
 # NODE_VER
 # isProduction
 
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+nvm use $NODE_VER &> /dev/null
+
 export currentDirectory=$(pwd)
 export themesDirectory=${currentDirectory}/wp-content/themes
 export pluginsDirectory=${currentDirectory}/wp-content/plugins
