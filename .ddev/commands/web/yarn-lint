@@ -14,9 +14,10 @@ export scriptRoot=$(cd "${BASH_SOURCE%/*}" && pwd)
 source $scriptRoot/.utilities
 
 addLintScript() {
-  if [[ $(jq '.scripts.lint | length' package.json) = 0 ]]; then
-    jq --indent 4 '.scripts.lint |= "eslint --fix --ext .js $npm_package_theme_directory/assets/scripts"' package.json >package.json.tmp && mv package.json.tmp package.json
+  if [[ $(jq '.devDependencies.prettier | length' package.json) = 0 ]]; then
     echo "Adding lint script to package.json"
+    yarn add --dev --exact prettier
+    jq --indent 4 '.scripts.lint |= "eslint --fix --ext .js $npm_package_theme_directory/assets/scripts; prettier --write $npm_package_theme_directory/assets/styles/**/*.scss"' package.json >package.json.tmp && mv package.json.tmp package.json
   fi
 }
 
