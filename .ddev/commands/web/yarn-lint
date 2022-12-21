@@ -17,7 +17,7 @@ addLintScript() {
   if [[ $(jq '.devDependencies.prettier | length' package.json) = 0 ]]; then
     echo "Adding lint script to package.json"
     yarn add --dev --exact prettier
-    jq --indent 4 '.scripts.lint |= "eslint --fix --ext .js $npm_package_theme_directory/assets/scripts; prettier --write $npm_package_theme_directory/assets/styles/"' package.json >package.json.tmp && mv package.json.tmp package.json
+    jq --indent 4 '.scripts.lint |= "eslint --fix --ext .js $npm_package_theme_directory/assets/scripts; prettier --print-width 120 --write $npm_package_theme_directory/assets/styles/"' package.json >package.json.tmp && mv package.json.tmp package.json
   fi
 }
 
