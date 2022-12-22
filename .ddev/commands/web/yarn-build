@@ -34,5 +34,4 @@ cd "${currentDirectory}"
 
 if [ ! -z "${SOFT_RESET}" ]; then
   rm -f .ddev/.updated
-  source $scriptRoot/yarn-lint
 fi
