@@ -12,33 +12,35 @@
 
 export scriptRoot=$(cd "${BASH_SOURCE%/*}" && pwd)
 source $scriptRoot/.utilities
-checkDevDependencies() {
+addWebpackScripts() {
   if [[ $(jq '.devDependencies.terser | length' package.json) = 0 ]]; then
-    echo "Adding scripts..."
+    echo "Adding lint scripts..."
     yarn add --dev --exact prettier terser
   fi
-}
-addWebpackScripts() {
-  terser='find $npm_package_theme_directory/assets/scripts -name \"*.js\" | while read fname; do terser \"$fname\" --format comments=all --output \"$fname\"; done'
-  prettierJS='prettier --print-width 100 --trailing-comma none --write $npm_package_theme_directory/assets/scripts/{*.js,**/*.js}'
-  prettierScss='prettier --print-width 120 --write $npm_package_theme_directory/assets/styles/'
+  terser='find $npm_package_theme_directory/assets/scripts -name \"*.js\" | while read fname; do terser \"$fname\" --format comments=all,keep_numbers=true,ecma=2018 --output \"$fname\"; done'
+  prettierJS='prettier --print-width 100 --trailing-comma none --single-quote true --write $npm_package_theme_directory/assets/scripts/{*.js,**/*.js}'
+  prettierScss='prettier --print-width 120 --single-quote true --write $npm_package_theme_directory/assets/styles/'
   cleanupScss="replace '{\\\n*\\\s*}' '{}' \$npm_package_theme_directory/assets/styles/ -r --include='*.scss'"
   lint='eslint --fix --ext .js $npm_package_theme_directory/assets/scripts'
   jq --indent 4 ".scripts.terserJS = \"${terser}\" | .scripts.prettierJS = \"${prettierJS}\" | .scripts.prettierSCSS = \"${prettierScss}; ${cleanupScss}\" | .scripts.lint = \"${lint}\"" package.json >package.json.tmp && mv package.json.tmp package.json
 }
 addBowerScripts() {
-  terser='find ./assets/scripts -name \"*.js\" | while read fname; do terser \"$fname\" --format comments=all --output \"$fname\"; done'
-  prettierJS='prettier --print-width 100 --write ./assets/scripts/{*.js,**/*.js}'
-  prettierScss='prettier --print-width 120 --write ./assets/styles/{*.scss,**/*.scss}'
+  if [[ $(jq '.devDependencies.terser | length' package.json) = 0 ]]; then
+    echo "Adding lint scripts..."
+    yarn add --dev --exact prettier terser jscs
+  fi
+  terser='find ./assets/scripts -name \"*.js\" | while read fname; do terser \"$fname\" --format comments=all,keep_numbers=true,ecma=5 --output \"$fname\"; done'
+  prettierJS='prettier --print-width 120 --single-quote true --write ./assets/scripts/{*.js,**/*.js}'
+  prettierScss='prettier --print-width 120 --single-quote true --write ./assets/styles/{*.scss,**/*.scss}'
   cleanupScss="replace '{\\\n*\\\s*}' '{}' ./assets/styles/ -r --include='*.scss'"
-  jq --indent 4 ".scripts.terserJS = \"${terser}\" | .scripts.prettierJS = \"${prettierJS}\" | .scripts.prettierSCSS = \"${prettierScss}; ${cleanupScss}\"" package.json >package.json.tmp && mv package.json.tmp package.json
+  lint='find ./assets/scripts -name \"*.js\" | while read fname; do jscs --fix \"$fname\"; done'
+  jq --indent 4 ".scripts.terserJS = \"${terser}\" | .scripts.prettierJS = \"${prettierJS}\" | .scripts.prettierSCSS = \"${prettierScss}; ${cleanupScss}\" | .scripts.lint = \"${lint}\"" package.json >package.json.tmp && mv package.json.tmp package.json
 }
 
 for buildDir in $buildDirs; do
   cd ${buildDir}
   if [ -f package.json ]; then
     if [ -f webpack.config.js ]; then
-      checkDevDependencies
       addWebpackScripts
       yarn terserJS
       yarn prettierJS
@@ -46,10 +48,10 @@ for buildDir in $buildDirs; do
       yarn prettierSCSS
     fi
     if [ -f bower.json ]; then
-      checkDevDependencies
       addBowerScripts
       yarn terserJS
       yarn prettierJS
+      yarn lint
       yarn prettierSCSS
     fi
   fi
