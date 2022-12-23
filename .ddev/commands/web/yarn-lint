@@ -12,6 +12,30 @@
 
 export scriptRoot=$(cd "${BASH_SOURCE%/*}" && pwd)
 source $scriptRoot/.utilities
+addGitHook() {
+  if [ -d .git ]; then
+    if [ ! -f .git/hooks/pre-commit ]; then
+      mkdir -p .git/hooks
+      touch .git/hooks/pre-commit
+      chmod +x .git/hooks/pre-commit
+    fi
+    cat <<EOT >.git/hooks/pre-commit
+#!/bin/bash
+
+list=\$(git diff --cached --name-only --diff-filter=ACM)
+if [[ "\$list" == *".scss"* ]] || [[ "\$list" == *".js"* ]]; then
+  if [[ ! -z "\$(which ddev)" ]] && ddev exec pwd &> /dev/null; then
+    echo "Applying formatting..."
+    ddev yarn-lint &> /dev/null
+    ddev mutagen sync
+    for fname in \$list; do
+        git add -A "\${fname}"
+    done
+  fi
+fi
+EOT
+  fi
+}
 addWebpackScripts() {
   if [[ $(jq '.devDependencies.terser | length' package.json) = 0 ]]; then
     echo "Adding lint scripts..."
@@ -58,3 +82,4 @@ for buildDir in $buildDirs; do
 done
 
 cd "${currentDirectory}"
+addGitHook
