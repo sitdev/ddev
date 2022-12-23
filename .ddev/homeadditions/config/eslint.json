@@ -1,0 +1,51 @@
+{
+    "rules": {
+        "padding-line-between-statements": [
+            "error",
+            {
+                "blankLine": "always",
+                "prev": "*",
+                "next": [
+                    "multiline-block-like",
+                    "block-like",
+                    "if",
+                    "export",
+                    "function"
+                ]
+            },
+            {
+                "blankLine": "always",
+                "prev": [
+                    "multiline-block-like",
+                    "block-like",
+                    "multiline-expression",
+                    "if",
+                    "export",
+                    "function"
+                ],
+                "next": "*"
+            },
+            {
+                "blankLine": "never",
+                "prev": [
+                    "const",
+                    "let",
+                    "var",
+                    "if"
+                ],
+                "next": [
+                    "if"
+                ]
+            },
+            {
+                "blankLine": "never",
+                "prev": [
+                    "*"
+                ],
+                "next": [
+                    "return"
+                ]
+            }
+        ]
+    }
+}
