@@ -7,6 +7,7 @@ baseDir="$(pwd)"
 targetDir=.conf/migrations/compare
 
 ddev ssh -- <<EOF
+[ -s ~/.nvm/nvm.sh ] && /bin/bash ~/.nvm/nvm.sh || true
 mkdir -p $targetDir
 cd $targetDir
 cat <<EOT >package.json
@@ -22,8 +23,8 @@ cat <<EOT >package.json
     }
 }
 EOT
-nvm install 12 &> /dev/null
-nvm use 12 &> /dev/null
+nvm install 12 &> /dev/null || true
+nvm use 12 &> /dev/null || true
 yarn
 cat <<EOT >percy.config.json
 {
@@ -36,13 +37,11 @@ fi
 if [ ! -f local-domain.txt ]; then
   echo "${DDEV_PRIMARY_URL}" > local-domain.txt
 fi
+
+yq -P percy-sitemap.json | sed -e 's/\- //' > sitemap.txt
+nvm use $NODE_VER &> /dev/null || true
 EOF
 
-ddev ssh -- <<EOF
-cd $targetDir
-yq -P percy-sitemap.json | sed -e 's/\- //' > sitemap.txt
-nvm use $NODE_VER &> /dev/null
-EOF
 ddev mutagen sync
 cd $targetDir
 localDomain=$(cat local-domain.txt)
