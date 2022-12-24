@@ -1,6 +1,6 @@
 #!/bin/bash
 
-script_root=$(cd "${BASH_SOURCE%/*}" && pwd)
+export script_root=$(cd "${BASH_SOURCE%/*}" && pwd)
 revision=$(cd "$script_root" && git rev-parse HEAD)
 
 if [ -f .ddev/.revision ]; then
