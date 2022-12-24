@@ -1,7 +1,7 @@
 # Situation DDEV
 # Version: 0.0.1
 
-UPDATE_BRANCH="main"
+UPDATE_BRANCH="php7"
 .PHONY: *
 
 all: develop
