@@ -4,33 +4,32 @@ data_folder=.conf
 settings_file="${data_folder}/settings"
 
 guess_node_ver() {
+  local node_ver
+
   if [[ -f package.json && ! -z "$(grep "situation/webpack" package.json)" ]]; then
-    echo 12
-    return 0
+    node_ver=12
+  elif [ "$(find wp-content/themes -maxdepth 2 -name bower.json)" ]; then
+    node_ver=10
+  elif [ "$(find wp-content/themes -maxdepth 2 -name package.json -exec grep -rl "situation/webpack" {} \;)" ]; then
+    node_ver=12
+  else
+    node_ver=16
   fi
-  if [ "$(find wp-content/themes -maxdepth 2 -name bower.json)" ]; then
-    echo 10
-    return 0
-  fi
-  if [ "$(find wp-content/themes -maxdepth 2 -name package.json -exec grep -rl "situation/webpack" {} \;)" ]; then
-    echo 12
-    return 0
-  fi
-  echo 16
+  echo "$node_ver"
 }
 
 is_multisite() {
-  cat wp-config.php | grep WP_ALLOW_MULTISITE | grep true
+  grep -q 'WP_ALLOW_MULTISITE.*true' wp-config.php
 }
-
-if [ ! -f $settings_file ]; then
-  mkdir -p $data_folder
-  touch $settings_file
+if [ ! -f "$settings_file" ]; then
+  mkdir -p "$data_folder"
+  touch "$settings_file"
 fi
-source $settings_file
+
+source "$settings_file"
 if [ -z "${SITE_NAME}" ]; then
-  default_site_name=$(basename $(git config --get remote.origin.url) .git)
-  read -p "Project Slug (ie https://{$default_site_name}.test): [$default_site_name] " SITE_NAME
+  default_site_name=$(git config --get remote.origin.url | sed 's/\.git$//' | xargs basename)
+  read -p -r "Project Slug (ie https://{$default_site_name}.test): [$default_site_name] " SITE_NAME
   SITE_NAME=${SITE_NAME:-$default_site_name}
 fi
 
@@ -46,7 +45,7 @@ if [ -z "${NODE_VER}" ]; then
   NODE_VER=${NODE_VER:-${node_guess}}
 fi
 
-if [ ! -z "$(is_multisite)" ] && [ -z "${ADDITIONAL_HOSTS}" ]; then
+if is_multisite && [ -z "${ADDITIONAL_HOSTS}" ]; then
   echo "Additional Multisite hosts"
   read -p "(separate by space, no protocol or TLD - eg \"situationuk townhall situationgroup\": " ADDITIONAL_HOSTS
 fi

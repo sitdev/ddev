@@ -2,8 +2,6 @@
 
 ## Description: Clean all build files and installed dependencies.
 
-rm -rf wp-content/vendor wp-content/plugins wp wp-content/themes/orchestrator
-find . -type d -name "node_modules" -prune -exec rm -rf {} \;
-find wp-content/themes -type d -name "bower_components" -prune -exec rm -rf {} \;
-find wp-content/themes -type d  -name "dist" -prune -exec rm -rf {} \;
+rm -rf wp-content/vendor wp-content/plugins wp wp-content/themes/orchestrator node_modules
+find wp-content/themes -type d \( -name "node_modules" -o -name "bower_components" -o -name "dist" \) -prune | xargs -P 4 -I {} rm -rf {}
 ddev mutagen reset
