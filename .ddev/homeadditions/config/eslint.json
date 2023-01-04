@@ -21,7 +21,9 @@
                     "multiline-expression",
                     "if",
                     "export",
-                    "function"
+                    "function",
+                    "import",
+                    "cjs-import"
                 ],
                 "next": "*"
             },
