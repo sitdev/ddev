@@ -47,6 +47,17 @@
                 "next": [
                     "return"
                 ]
+            },
+            {
+                "blankLine": "never",
+                "prev": [
+                    "import",
+                    "cjs-import"
+                ],
+                "next": [
+                    "import",
+                    "cjs-import"
+                ]
             }
         ]
     }
