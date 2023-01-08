@@ -7,6 +7,7 @@ if [ -f .ddev/.revision ]; then
   old_revision=$(cat .ddev/.revision)
 fi
 
+source "${script_root}/bin/updates.sh"
 source "${script_root}/bin/check-dependencies.sh"
 source "${script_root}/bin/create-settings.sh"
 

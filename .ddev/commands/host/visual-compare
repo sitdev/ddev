@@ -2,7 +2,7 @@
 
 ## Description: Update composer dependencies and rebuild yarn cache if needed.
 
-source .conf/settings
+source .conf/.env
 baseDir="$(pwd)"
 targetDir=.conf/migrations/compare
 
