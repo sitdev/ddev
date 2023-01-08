@@ -1,7 +1,7 @@
 # Situation DDEV
 # Version: 0.0.1
 
-UPDATE_BRANCH="refactor"
+UPDATE_BRANCH="main"
 .PHONY: *
 
 all: develop
