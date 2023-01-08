@@ -29,7 +29,7 @@ fi
 source "$settings_file"
 if [ -z "${SITE_NAME}" ]; then
   default_site_name=$(git config --get remote.origin.url | sed 's/\.git$//' | xargs basename)
-  read -p -r "Project Slug (ie https://{$default_site_name}.test): [$default_site_name] " SITE_NAME
+  read -p "Project Slug (ie https://{$default_site_name}.test): [$default_site_name] " SITE_NAME
   SITE_NAME=${SITE_NAME:-$default_site_name}
 fi
 
