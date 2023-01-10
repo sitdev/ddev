@@ -3,7 +3,7 @@
 ## Description: Update composer dependencies and rebuild yarn cache if needed.
 source .conf/.env
 echo "Checking for updates..."
-composer config platform.php 7.4
+ddev composer config platform.php 7.4
 updates=$(ddev composer update -o --no-install 2>&1)
 echo "${updates}"
 if [[ "$updates" != *"Nothing to modify in lock file"* ]]; then
