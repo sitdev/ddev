@@ -59,8 +59,8 @@ addBowerScripts() {
     merged_data=$(echo $current_data | jq --argjson new_data "$newjscs_data" '. += $new_data')
     echo $merged_data | jq . --indent 4 > ~/config/.jscsrc
   fi
-  terser='find ./assets/scripts -name \"*.js\" | while read fname; do terser \"$fname\" --format comments=all,keep_numbers=true,ecma=5 --output \"$fname\"; sed -i \"s/\\*\\//&\\n/\" \"$fname\"; sed -i \"/^$/d\" \"$fname\"; jscs --config ~/config/jscsrc-obj.json --fix \"$fname\"; done'
-  prettierJS='prettier --print-width 120 --single-quote true --write ./assets/scripts/{*.js,**/*.js}'
+  terser='find ./assets/scripts -name \"*.js\" | while read fname; do terser \"$fname\" --format comments=all,keep_numbers=true,ecma=5 --output \"$fname\"; sed -i \"s/\\*\\//&\\n/\" \"$fname\"; sed -i \"/^$/d\" \"$fname\"; done'
+  prettierJS='prettier --print-width 100 --single-quote true --write ./assets/scripts/{*.js,**/*.js}'
   prettierScss='prettier --print-width 120 --single-quote true --write ./assets/styles/{*.scss,**/*.scss}'
   cleanupScss="replace '{\\\n*\\\s*}' '{}' ./assets/styles/ -r --include='*.scss'"
   lint='find ./assets/scripts -type d | while read dname; do jscs --config ~/config/.jscsrc --fix \"$dname\"; done'
