@@ -43,6 +43,8 @@ buildProfiles() {
         replace "{{local-domain}}" "${LOCAL_DOMAIN}" ".conf/migrations/push-${environment}.yaml" --silent
       fi
     done
+  else
+    touch $CONNECTIONS_FILE
   fi
 }
 registerConnection() {
