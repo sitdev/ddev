@@ -1,7 +1,7 @@
 #!/bin/bash
 
 data_folder=.conf
-settings_file="${data_folder}/settings"
+settings_file="${data_folder}/.env"
 
 guess_node_ver() {
   local node_ver
@@ -51,15 +51,14 @@ if is_multisite && [ -z "${ADDITIONAL_HOSTS}" ]; then
 fi
 
 cat <<EOT >$settings_file
-#!/bin/bash
-export SITE_NAME="${SITE_NAME}"
-export SITE_TITLE="${SITE_TITLE}"
-export NODE_VER="${NODE_VER}"
+SITE_NAME="${SITE_NAME}"
+SITE_TITLE="${SITE_TITLE}"
+NODE_VER="${NODE_VER}"
 EOT
 
 if [ ! -z "${ADDITIONAL_HOSTS}" ]; then
   cat <<EOT >>$settings_file
-export ADDITIONAL_HOSTS="${ADDITIONAL_HOSTS}"
+ADDITIONAL_HOSTS="${ADDITIONAL_HOSTS}"
 EOT
 fi
 

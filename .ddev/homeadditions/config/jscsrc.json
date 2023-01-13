@@ -1,0 +1,14 @@
+{
+    "requirePaddingNewlinesBeforeKeywords": [
+        "function"
+    ],
+    "requirePaddingNewLinesAfterBlocks": {
+        "allExcept": [
+            "inCallExpressions",
+            "inNewExpressions",
+            "inArrayExpressions",
+            "inProperties",
+            "singleLine"
+        ]
+    }
+}

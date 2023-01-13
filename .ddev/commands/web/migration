@@ -11,7 +11,7 @@
 
 action=$1
 TEMP_FILE=~/connection-string.txt
-CONNECTIONS_FILE=.conf/.connections
+CONNECTIONS_FILE=.conf/connections.yaml
 mkdir -p .conf/migrations
 LOCAL_DOMAIN=$(echo $DDEV_PRIMARY_URL | replace "https://" "" -z)
 
@@ -22,10 +22,9 @@ fi
 
 buildProfiles() {
   if [ -f $CONNECTIONS_FILE ]; then
-    while read p; do
-      IFS="|" read environment encodedConnectionString <<<"$p"
-      connectionString=$(bash ~/bin/decode "${encodedConnectionString}")
-      echo "${connectionString}" | head -1 > $TEMP_FILE
+    for environment in $(yq 'to_entries | .[] | .key' $CONNECTIONS_FILE); do
+      connectionString=$(bash ~/bin/decode "$(yq ".${environment}.connection" $CONNECTIONS_FILE)")
+      echo "${connectionString}" | head -1 >$TEMP_FILE
       replace "https://" "" $TEMP_FILE --silent
       replace "/wp" "" $TEMP_FILE --silent
       remoteDomain=$(cat $TEMP_FILE)
@@ -33,7 +32,7 @@ buildProfiles() {
 
       if [ ! -f ".conf/migrations/pull-${environment}.yaml" ]; then
         cp .ddev/migrations/pull-template.yaml ".conf/migrations/pull-${environment}.yaml"
-        yq ".profiles[0].connection_info = \"${connectionString}\"" -i ".conf/migrations/pull-${environment}.yaml" 
+        yq ".profiles[0].connection_info = \"${connectionString}\"" -i ".conf/migrations/pull-${environment}.yaml"
         replace "{{remote-domain}}" "${remoteDomain}" ".conf/migrations/pull-${environment}.yaml" --silent
         replace "{{local-domain}}" "${LOCAL_DOMAIN}" ".conf/migrations/pull-${environment}.yaml" --silent
       fi
@@ -43,7 +42,9 @@ buildProfiles() {
         replace "{{remote-domain}}" "${remoteDomain}" ".conf/migrations/push-${environment}.yaml" --silent
         replace "{{local-domain}}" "${LOCAL_DOMAIN}" ".conf/migrations/push-${environment}.yaml" --silent
       fi
-    done <$CONNECTIONS_FILE
+    done
+  else
+    touch $CONNECTIONS_FILE
   fi
 }
 registerConnection() {
@@ -52,13 +53,9 @@ registerConnection() {
   envName=$(dialog --erase-on-exit --title "Environment Name" --inputbox "Name of environment? [staging|production|custom]" 23 70 staging 3>&1 1>&2 2>&3)
   rm -f $TEMP_FILE
   encoded=$(bash ~/bin/encode "${connectionString}")
-  if [[ ! -z "${connectionString}" ]] && [[ ! -z "${envName}" ]]; then
+  if [[ -n "${connectionString}" ]] && [[ -n "${envName}" ]]; then
     find .conf/migrations -type f -name "*-${envName}.yaml" -prune -exec rm -f {} \;
-    if [ -f $CONNECTIONS_FILE ]; then
-      cat $CONNECTIONS_FILE | grep -v "${envName}" >$CONNECTIONS_FILE.temp
-      mv $CONNECTIONS_FILE.temp $CONNECTIONS_FILE
-    fi
-    printf "${envName}|${encoded}\n" >>$CONNECTIONS_FILE
+    yq ".$envName.connection = \"$encoded\"" -i $CONNECTIONS_FILE
     git add $CONNECTIONS_FILE
     buildProfiles
     showMenu
