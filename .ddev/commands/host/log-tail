@@ -1,0 +1,5 @@
+#!/bin/bash
+
+## Description: Tail the log, but only show php errors
+
+ddev logs -f --tail 10 | grep --line-buffered "proxy_fcgi:error" | sed -u 's/.*client//' | sed -u 's/^.*] //' | sed -u 's/\\n/\n/g' | sed 's/PHP message:/\n/g'
