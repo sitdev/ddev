@@ -5,6 +5,7 @@
 source .conf/.env
 baseDir="$(pwd)"
 targetDir=.conf/migrations/compare
+fname='\$fname'
 
 ddev ssh -- <<EOF
 [ -s ~/.nvm/nvm.sh ] && /bin/bash ~/.nvm/nvm.sh || true
@@ -16,10 +17,12 @@ cat <<EOT >package.json
     "version": "1.0.0",
     "license": "MIT",
     "scripts": {
-        "build-sitemap": "situation-percy --dry-run"
+        "build-sitemap": "situation-percy --dry-run",
+        "pretty-html": "find html -name \"*.html\" | while read fname; do html \"$fname\"; done"
     },
     "devDependencies": {
-        "@situation/percy": "file:../../../wp-content/vendor/situation/scripts/percy"
+        "@situation/percy": "file:../../../wp-content/vendor/situation/scripts/percy",
+        "html-cli": "^1.0.0"
     }
 }
 EOT
@@ -37,11 +40,9 @@ fi
 if [ ! -f local-domain.txt ]; then
   echo "${DDEV_PRIMARY_URL}" > local-domain.txt
 fi
-
 yq -P percy-sitemap.json | sed -e 's/\- //' > sitemap.txt
 nvm use $NODE_VER &> /dev/null || true
 EOF
-
 ddev mutagen sync
 cd $targetDir
 localDomain=$(cat local-domain.txt)
@@ -53,13 +54,49 @@ echo "${remoteDomain}" >remote-domain.txt
 if [ -z "${remoteDomain}" ]; then
   exit
 fi
+bareRemote=$(echo $remoteDomain | ddev replace "https://" "" -z --quiet)
+bareLocal=$(echo $localDomain | ddev replace "https://" "" -z --quiet)
+read -n 1 -p "Skip html downloading for comparison? Press Y to skip: " confirm
+echo
+if [[ ! $confirm =~ [yY] ]]; then
+  rm -rf html
+  while read path; do
+    echo "Saving ${path}"
+    mkdir -p "html/${bareLocal}${path}"
+    mkdir -p "html/${bareRemote}${path}"
+    wget -q --no-check-certificate "${localDomain}${path}" -O "html/${bareLocal}${path}/index.html"
+    wget -q --no-check-certificate "${remoteDomain}${path}" -O "html/${bareRemote}${path}/index.html"
+  done 3<&0 <sitemap.txt
+  ddev mutagen sync
+  ddev ssh -- <<EOF
+[ -s ~/.nvm/nvm.sh ] && /bin/bash ~/.nvm/nvm.sh || true
+cd $targetDir
+nvm install 12 &> /dev/null || true
+nvm use 12 &> /dev/null || true
+replace "${bareLocal}" "${bareRemote}" html -r --quiet &>/dev/null
+echo "Formatting html..."
+yarn pretty-html &>/dev/null
+nvm use $NODE_VER &> /dev/null || true
+EOF
+  ddev mutagen sync
+  echo "Creating git repo..."
+  mkdir -p html/repo
+  cp -r html/$bareRemote/* html/repo/
+  (cd html/repo && git init . && git add -A . && git commit -am "Remote html" && rm -rf ./*) &>/dev/null
+  cp -r html/$bareLocal/* html/repo/
+  (cd html/repo && git add -A .) &>/dev/null
+  echo
+  echo "Git repo added here:"
+  (cd html/repo && pwd)
+  printf "\nUse git diff to view the differences between the staged changes from local and the commit created from the remote version.\n\n" 
+fi
 while read path; do
   echo "Testing: ${path}"
-  echo "(q to quit, enter to continue)"
-  read -u 3 input
+  read -n 1 -p "(q to quit, enter to continue) " input < /dev/tty
+  echo
   if [[ $input =~ ^[Qq]$ ]]; then
     exit
   fi
   open "${localDomain}${path}"
   open "${remoteDomain}${path}"
-done 3<&0 <sitemap.txt
+done <sitemap.txt
