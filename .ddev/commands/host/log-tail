@@ -2,4 +2,9 @@
 
 ## Description: Tail the log, but only show php errors
 
-ddev logs -f --tail 10 | grep --line-buffered "proxy_fcgi:error" | sed -u 's/.*client//' | sed -u 's/^.*] //' | sed -u 's/\\n/\n/g' | sed 's/PHP message:/\n/g'
+ddev logs -f --tail 10 |
+  grep --line-buffered "said into stderr:\|, referer" |
+  sed -u 's/^.*into stderr: "//g' |
+  sed -u 's/"$//g' |
+  sed -u 's/NOTICE: PHP message: //g' |
+  sed -u 's/^.*, referer/referer/g'
