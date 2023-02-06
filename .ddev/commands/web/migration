@@ -44,7 +44,7 @@ buildProfiles() {
       fi
     done
   else
-    touch $CONNECTIONS_FILE
+    echo "---" > $CONNECTIONS_FILE
   fi
 }
 registerConnection() {
