@@ -10,3 +10,4 @@ else
     touch .ddev/.plugin-dev-mode
     echo "Plugin dev mode activated"
 fi
+ddev mutagen sync

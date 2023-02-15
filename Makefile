@@ -85,7 +85,7 @@ pull-production: ## Run a pre-defined WP Migrate DB profile to pull the producti
 	@ddev run-migration pull-production
 
 plugin-dev-mode: ## Toggles an alternate build process which clears and re-installs all Situation node_modules content before each build.
-	@ddev toggle-plugin-dev-mode
+	@/bin/bash .ddev/commands/host/toggle-plugin-dev-mode
 
 status: ## Show project status and tools
 	@ddev status
