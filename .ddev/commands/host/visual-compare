@@ -36,6 +36,7 @@ if [ ! -f local-domain.txt ]; then
 fi
 grep -o '<loc>.*</loc>' sitemap.xml | sed 's#<loc>\(.*\)</loc>#\1#' > sitemap.txt
 replace "${DDEV_PRIMARY_URL}" "" sitemap.txt --silent
+sed -i '/\.pdf$/d' sitemap.txt
 nvm use $NODE_VER &> /dev/null || true
 EOF
 ddev mutagen sync

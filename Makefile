@@ -84,6 +84,9 @@ pull-staging: ## Run a pre-defined WP Migrate DB profile to pull the staging env
 pull-production: ## Run a pre-defined WP Migrate DB profile to pull the production environment
 	@ddev run-migration pull-production
 
+test: 
+	@ddev test-phpunit
+
 plugin-dev-mode: ## Toggles an alternate build process which clears and re-installs all Situation node_modules content before each build.
 	@/bin/bash .ddev/commands/host/toggle-plugin-dev-mode
 
