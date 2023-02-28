@@ -57,7 +57,7 @@ addBowerScripts() {
     newjscs_data=$(cat ~/config/jscsrc.json)
     current_data=$(cat .jscsrc)
     merged_data=$(echo $current_data | jq --argjson new_data "$newjscs_data" '. += $new_data')
-    echo $merged_data | jq . --indent 4 > ~/config/.jscsrc
+    echo $merged_data | jq . --indent 4 >~/config/.jscsrc
   fi
   terser='find ./assets/scripts -name \"*.js\" | while read fname; do terser \"$fname\" --format comments=all,keep_numbers=true,ecma=5 --output \"$fname\"; sed -i \"s/\\*\\//&\\n/\" \"$fname\"; sed -i \"/^$/d\" \"$fname\"; done'
   prettierJS='prettier --print-width 100 --single-quote true --write ./assets/scripts/{*.js,**/*.js}'
@@ -66,6 +66,13 @@ addBowerScripts() {
   lint='find ./assets/scripts -type d | while read dname; do jscs --config ~/config/.jscsrc --fix \"$dname\"; done'
   jq --indent 4 ".scripts.terserJS = \"${terser}\" | .scripts.prettierJS = \"${prettierJS}\" | .scripts.prettierSCSS = \"${prettierScss}; ${cleanupScss}\" | .scripts.lint = \"${lint}\"" package.json >package.json.tmp && mv package.json.tmp package.json
 }
+
+for childThemeDir in $childThemes; do
+  cd $childThemeDir
+  if [ -f .jshintrc ]; then
+    replace '"esnext": true,' '"esversion": 11,' .jshintrc --silent
+  fi
+done
 
 for buildDir in $buildDirs; do
   cd ${buildDir}
