@@ -13,6 +13,6 @@ fi
 if [ ! -f local-tests-config.php ]; then
   cp ~/config/phpunit/local-tests-config.php ./
 fi
-jq '.scripts.test = "phpunit"' composer.json > composer.json.tmp && mv composer.json.tmp composer.json
+jq --indent 4 '.scripts.test = "phpunit"' composer.json > composer.json.tmp && mv composer.json.tmp composer.json
 
 composer test
