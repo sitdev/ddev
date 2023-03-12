@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 updateSettingsFile() {
   local file=$1

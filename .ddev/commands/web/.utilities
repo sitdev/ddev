@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # SITE_NAME
 # SITE_TITLE
 # NODE_VER
@@ -6,7 +6,7 @@
 
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-nvm use $NODE_VER &> /dev/null
+nvm use $NODE_VER >/dev/null 2>&1
 
 export currentDirectory=$(pwd)
 export themesDirectory=${currentDirectory}/wp-content/themes
@@ -31,7 +31,7 @@ installYarn() {
   if [ -f package.json ]; then
     [ -z $SOFT_RESET ] && yarn || yarn install --check-files 
     if [ -f bower.json ]; then
-      [ -z "$(which bower)" ] && yarn global add bower || true
+      command -v bower >/dev/null 2>&1 || yarn global add bower
       bower install
     fi
   fi

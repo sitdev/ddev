@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 ## Description: Run a previously saved WP Sync DB migration profile.
 ## Usage: run-migration [args]
@@ -24,21 +24,21 @@ if [ -f ${FILE} ]; then
   fi
   option=$(yq -o=json "${FILE}")
   wp option update wpsdb_settings "${option}" --format=json --url=${DDEV_PRIMARY_URL}
-  wp plugin is-installed wp-sync-db-cli --url=${DDEV_PRIMARY_URL} &>/dev/null || composer require wp-sync-db/wp-sync-db-cli:dev-master --dev
-  wp plugin is-active wp-sync-db-cli --url=${DDEV_PRIMARY_URL} &>/dev/null || wp plugin activate wp-sync-db-cli --url=${DDEV_PRIMARY_URL}
-  if [ -z "$(grep situation/wp-sync-db-media-files composer.json)" ]; then
-    composer remove wp-sync-db/wp-sync-db-media-files &> /dev/null
-    composer require situation/wp-sync-db-media-files:dev-master -o &> /dev/null
-    composer update situation/backstage &> /dev/null
+  wp plugin is-installed wp-sync-db-cli --url=${DDEV_PRIMARY_URL} >/dev/null 2>&1 || composer require wp-sync-db/wp-sync-db-cli:dev-master --dev
+  wp plugin is-active wp-sync-db-cli --url=${DDEV_PRIMARY_URL} >/dev/null 2>&1 || wp plugin activate wp-sync-db-cli --url=${DDEV_PRIMARY_URL}
+  if ! grep -q situation/wp-sync-db-media-files composer.json; then
+    composer remove wp-sync-db/wp-sync-db-media-files >/dev/null 2>&1
+    composer require situation/wp-sync-db-media-files:dev-master -o >/dev/null 2>&1
+    composer update situation/backstage >/dev/null 2>&1
   fi
   migrationName=$(yq '.profiles[0].name' "${FILE}")
   echo "Running Migration: ${migrationName}"
   wp wpsdb migrate 1 --url=${DDEV_PRIMARY_URL}
   if [[ "${direction}" = "pull" ]]; then
-    wp plugin deactivate wp-rocket --url=${DDEV_PRIMARY_URL} &> /dev/null || true
-    wp plugin deactivate redis-cache --url=${DDEV_PRIMARY_URL} &> /dev/null || true
-    git restore --staged wp-config.php &> /dev/null || true
-    git restore wp-config.php &> /dev/null || true
+    wp plugin deactivate wp-rocket --url=${DDEV_PRIMARY_URL} >/dev/null 2>&1 || true
+    wp plugin deactivate redis-cache --url=${DDEV_PRIMARY_URL} >/dev/null 2>&1 || true
+    git restore --staged wp-config.php >/dev/null 2>&1 || true
+    git restore wp-config.php >/dev/null 2>&1 || true
   fi
 else
   echo "Migration ${1} not found."

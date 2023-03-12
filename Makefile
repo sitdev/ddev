@@ -5,7 +5,7 @@ UPDATE_BRANCH="main"
 .PHONY: *
 
 all: develop
-	@ddev wp core is-installed &> /dev/null || make local-init
+	@ddev wp core is-installed >/dev/null 2>&1 || make local-init
 	@printf "\nEnter \033[36mmake help\033[0m for more info\n\n"
 
 develop: start install build container-sync ## Turn on ddev and run build (default)
@@ -26,9 +26,17 @@ build-production:
 	@ddev yarn-build production
 
 start: ## Turn on ddev
-	@docker stats --no-stream &> /dev/null || colima start
-	@if [ ! -z "$$(make running 2>/dev/null)" ]; then \
-		if ddev list | grep -q running; then \
+	@if ! docker info >/dev/null 2>&1; then \
+		if command -v colima >/dev/null 2>&1; then \
+		  colima start; \
+		else \
+			echo "Docker doesn't appear to be running"; \
+			exit 1; \
+		fi; \
+  	fi
+  		 
+	@if ! make running 2>/dev/null; then \
+		if ddev list | grep -qi ok; then \
 		  ddev poweroff; \
 		fi; \
 		make self-update; \
@@ -45,7 +53,7 @@ shutdown: stop ## Clean build, full shutdown of ddev/colima
 
 container-sync:
 	@echo "Syncing mutagen container..."
-	@make running &> /dev/null && ddev mutagen sync || ddev mutagen reset
+	@make running 2>/dev/null && ddev mutagen sync || ddev mutagen reset
 
 watch: ## Start the watch task
 	@ddev yarn-watch
@@ -56,14 +64,14 @@ logging: ## Tail the ddev log
 clean: ## Clean build
 	@isRunning="$$(ddev exec pwd 2>/dev/null)"; \
 	/bin/bash .ddev/commands/host/clean-build; \
-	[ ! -z "$${isRunning}" ] && make start || true
+	[ -n "$${isRunning}" ] && make start || true
 
 reset: self-update ## Clean build and git hard reset/pull
 	@/bin/bash .ddev/commands/host/hard-reset
 
 update: start ## Composer update
 	@ddev platform-update
-	@[ ! -z "$$(make self-update)" ] && make restart || true
+	@[ -z "$$(make self-update)" ] || make restart
 
 self-update: ## Update Situation ddev config from remote repository. Branch is defined by $UPDATE_BRANCH.
 	@[ -z ${UPDATE_BRANCH} ] || /bin/bash -c "$$(curl -fsSL https://raw.githubusercontent.com/sitdev/ddev/main/install.sh)" -- "${UPDATE_BRANCH}" 
@@ -103,7 +111,7 @@ xdebug: ## Toggle Xdebug (off by default)
 	@ddev toggle-xdebug
 
 running:
-	@[ ! -z "$$(ddev exec pwd 2>/dev/null)" ] || (echo "Run \"make\" or \"make start\" to start"; exit 1)
+	@ddev exec pwd >/dev/null 2>&1 || exit 1
 
 remove-project: ## Remove project from DDEV project list. Local db is deleted, files are not
 	-@ddev delete -O

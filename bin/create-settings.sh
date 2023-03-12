@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 data_folder=.conf
 settings_file="${data_folder}/.env"

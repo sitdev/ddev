@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 [ -f .ddev/.plugin-dev-mode ] && pluginDevMode=1 || true
 rm -rf .ddev
 git add -A .
