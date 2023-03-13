@@ -12,7 +12,7 @@ wsl --install
 
 Reboot and wait for Ubuntu to finish installing.
 
-### DDEV Install
+## DDEV Install
 
 Run the following in an administrative PowerShell:
 
@@ -23,7 +23,7 @@ iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercon
 
 More detailed instructions can be found on the DDEV “[Getting Started](https://ddev.com/get-started/)” page.
 
-### SSH Config
+## SSH Config
 
 If you haven't added an [SSH key to your GitHub account](https://github.com/settings/keys), follow the [instructions provided by GitHub](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent) to do so. You may wish to leave the passphrase blank, as it will be requested frequently during the normal composer install process.
 
@@ -45,37 +45,38 @@ To copy the .ssh folder from the Windows installation into the WSL container use
     chmod 644 ~/.ssh/*.pub
     ```
 
-   ### WSL Dependencies
 
-   In the WSL2 instance terminal, install `make`:
+## WSL Dependencies
 
-    ```bash
-    sudo apt-get install make
-    ```
+In the WSL2 instance terminal, install `make`:
 
-   ### Project Setup
+```bash
+sudo apt-get install make
+```
 
-   In the WSL2 instance terminal, set up your first project.
+## Project Setup
 
-    ```bash
-    mkdir ~/projects
-    cd ~/projects
-    git clone git@github.com:situationinteractive/{project}.git
-    cd {project}
-    git checkout develop
-    make
-    ```
+In the WSL2 instance terminal, set up your first project.
 
-   On first run, you may run into an error during `make`. If so, just run `make` again and it should be resolved. If not, a system reboot may be required.
+```bash
+mkdir ~/projects
+cd ~/projects
+git clone git@github.com:situationinteractive/{project}.git
+cd {project}
+git checkout develop
+make
+```
 
-   ### VS Code integration
+On first run, you may run into an error during `make`. If so, just run `make` again and it should be resolved. If not, a system reboot may be required.
 
-   If you don't already have it, you can install VS Code from an administrative Powershell terminal:
+## VS Code integration
 
-    ```bash
-    choco install vscode
-    ```
+If you don't already have it, you can install VS Code from an administrative Powershell terminal:
 
-   To connect to a codebase in a WSL2 instance using VS Code, you will first need to install the [Remote Development](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.vscode-remote-extensionpack) extension in VS Code.
+```bash
+choco install vscode
+```
 
-   Once the extension is installed, you can open your project in VS Code by running the command `code .` in the WSL2 terminal. This will launch a new instance of VS Code with the codebase open and ready to work on. Any VS Code terminal opened within the project is a WSL2 terminal, so all `make` commands can be conveniently run from that environment, and a separate WSL2 terminal is no longer necessary.
+To connect to a codebase in a WSL2 instance using VS Code, you will first need to install the [Remote Development](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.vscode-remote-extensionpack) extension in VS Code.
+
+Once the extension is installed, you can open your project in VS Code by running the command `code .` in the WSL2 terminal. This will launch a new instance of VS Code with the codebase open and ready to work on. Any VS Code terminal opened within the project is a WSL2 terminal, so all `make` commands can be conveniently run from that environment, and a separate WSL2 terminal is no longer necessary.
