@@ -46,12 +46,19 @@ To copy the .ssh folder from the Windows installation into the WSL container use
     ```
 
 
-## WSL Dependencies
+## WSL Configuration
 
 In the WSL2 instance terminal, install `make`:
 
 ```bash
 sudo apt-get install make
+```
+
+Next, use the following commands to set global Git configuration settings:
+
+```bash
+git config --global user.name "Your Name"
+git config --global user.email "your.email@example.com"
 ```
 
 ## Project Setup
@@ -67,7 +74,7 @@ git checkout develop
 make
 ```
 
-On first run, you may run into an error during `make`. If so, just run `make` again and it should be resolved. If not, a system reboot may be required.
+On first run, you may run into an error during `make`. If so, just run `make stop && make` and it should be resolved. If not, a system reboot may be required.
 
 ## VS Code integration
 
