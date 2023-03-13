@@ -66,6 +66,8 @@ To copy the .ssh folder from the Windows installation into the WSL container use
     make
     ```
 
+   On first run, you may run into an error during `make`. If so, just run `make` again and it should be resolved. If not, a system reboot may be required.
+
    ### VS Code integration
 
    If you don't already have it, you can install VS Code from an administrative Powershell terminal:
