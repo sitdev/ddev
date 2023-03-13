@@ -64,7 +64,7 @@ logging: ## Tail the ddev log
 clean: ## Clean build
 	@isRunning="$$(ddev exec pwd 2>/dev/null)"; \
 	/bin/bash .ddev/commands/host/clean-build; \
-	[ -n "$${isRunning}" ] && make start || true
+	[ -z "$${isRunning}" ] || make start
 
 reset: self-update ## Clean build and git hard reset/pull
 	@/bin/bash .ddev/commands/host/hard-reset
