@@ -2,6 +2,7 @@ A DDEV setup for The Studio at Situation Group developers and freelancers.
 
 ## Getting Started
 
+For Windows, see [Setting up DDEV on Windows](docs/windows-setup.md)
 Inside your project repository/webroot, run the following:
 
 ```shell
