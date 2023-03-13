@@ -3,13 +3,8 @@ A DDEV setup for The Studio at Situation Group developers and freelancers.
 ## Getting Started
 
 For Windows, see [Setting up DDEV on Windows](docs/windows-setup.md)
-Inside your project repository/webroot, run the following:
 
-```shell
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/sitdev/ddev/main/install.sh)"
-```
-
-## Requirements
+## Requirements (macOS)
 
 ### Colima
 ```shell
@@ -28,6 +23,13 @@ brew install drud/ddev/ddev
 brew install nss
 mkcert -install
 ddev config global --mutagen-enabled
+```
+
+### First Run
+If your project does not have a Makefile yet, run the following inside your project repository/webroot:
+
+```shell
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/sitdev/ddev/main/install.sh)"
 ```
 
 ## More Documentation
