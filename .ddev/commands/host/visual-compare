@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 ## Description: Update composer dependencies and rebuild yarn cache if needed.
 
@@ -25,8 +25,8 @@ cat <<EOT >package.json
     }
 }
 EOT
-nvm install 16 &> /dev/null || true
-nvm use 16 &> /dev/null || true
+nvm install 16 >/dev/null 2>&1 || true
+nvm use 16 >/dev/null 2>&1 || true
 yarn
 if [ ! -f sitemap.xml ]; then
   yarn build-sitemap
@@ -37,7 +37,7 @@ fi
 grep -o '<loc>.*</loc>' sitemap.xml | sed 's#<loc>\(.*\)</loc>#\1#' > sitemap.txt
 replace "${DDEV_PRIMARY_URL}" "" sitemap.txt --silent
 sed -i '/\.pdf$/d' sitemap.txt
-nvm use $NODE_VER &> /dev/null || true
+nvm use $NODE_VER >/dev/null 2>&1 || true
 EOF
 ddev mutagen sync
 cd $targetDir
@@ -67,20 +67,20 @@ if [[ ! $confirm =~ [yY] ]]; then
   ddev ssh -- <<EOF
 [ -s ~/.nvm/nvm.sh ] && /bin/bash ~/.nvm/nvm.sh || true
 cd $targetDir
-nvm install 12 &> /dev/null || true
-nvm use 12 &> /dev/null || true
-replace "${bareLocal}" "${bareRemote}" html -r --quiet &>/dev/null
+nvm install 12 >/dev/null 2>&1 || true
+nvm use 12 >/dev/null 2>&1 || true
+replace "${bareLocal}" "${bareRemote}" html -r --quiet >/dev/null 2>&1
 echo "Formatting html..."
-yarn pretty-html &>/dev/null
-nvm use $NODE_VER &> /dev/null || true
+yarn pretty-html >/dev/null 2>&1
+nvm use $NODE_VER >/dev/null 2>&1 || true
 EOF
   ddev mutagen sync
   echo "Creating git repo..."
   mkdir -p html/repo
   cp -r html/$bareRemote/* html/repo/
-  (cd html/repo && git init . && git add -A . && git commit -am "Remote html" && rm -rf ./*) &>/dev/null
+  (cd html/repo && git init . && git add -A . && git commit -am "Remote html" && rm -rf ./*) >/dev/null 2>&1
   cp -r html/$bareLocal/* html/repo/
-  (cd html/repo && git add -A .) &>/dev/null
+  (cd html/repo && git add -A .) >/dev/null 2>&1
   echo
   echo "Git repo added here:"
   (cd html/repo && pwd)

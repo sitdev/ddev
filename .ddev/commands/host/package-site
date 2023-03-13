@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 echo "Be sure your local environment is freshly pulled from production. If not, please exit now and run the migration."
 echo ""

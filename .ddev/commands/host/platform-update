@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 ## Description: Update composer dependencies and rebuild yarn cache if needed.
 source .conf/.env

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 ## Description: Activate alternate build mode where the local dependencies are cleared and restored before the build.
 

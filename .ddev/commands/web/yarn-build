@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 ## Description: Run the yarn/webpack/gulp build.
 

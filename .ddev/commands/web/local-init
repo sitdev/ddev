@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 ## Description: Initialize a local WP database using standard defaults.
 ## Usage: local-init [flags]
@@ -23,10 +23,10 @@ if [ ! -z "${INITIAL_RUN}" ]; then
   read -p "sit-admin password: [test] " USER_PASS
   USER_PASS=${USER_PASS:-test}
 fi
-composer update situation/scripts situation/backstage -o &>/dev/null
+composer update situation/scripts situation/backstage -o >/dev/null 2>&1
 echo "Installing WP Core..."
 if is_multisite; then
-  wp core multisite-install --skip-config --url=${DDEV_PRIMARY_URL} --title="${SITE_TITLE}" --admin_user="sit-admin" --admin_email="developers@situationinteractive.com" &>/dev/null
+  wp core multisite-install --skip-config --url=${DDEV_PRIMARY_URL} --title="${SITE_TITLE}" --admin_user="sit-admin" --admin_email="developers@situationinteractive.com" >/dev/null 2>&1
   echo "const DOMAIN_CURRENT_SITE = '${DDEV_SITENAME}.${DDEV_TLD}';" >>./local-config.php
   [ -f wp-content/sunrise.php ] && echo "const SUNRISE = true;" >>./local-config.php
   [[ "${DDEV_SITENAME}" = "admin.baa" ]] && echo "const COOKIE_DOMAIN = 'baa.test';" >>./local-config.php
@@ -45,7 +45,7 @@ EOM
   wp rewrite structure '/%postname%/' --url=${DDEV_PRIMARY_URL}
   wp rewrite flush --url=${DDEV_PRIMARY_URL}
 else
-  wp core install --url=${DDEV_PRIMARY_URL} --title="${SITE_TITLE}" --admin_user="sit-admin" --admin_email="developers@situationinteractive.com" &>/dev/null
+  wp core install --url=${DDEV_PRIMARY_URL} --title="${SITE_TITLE}" --admin_user="sit-admin" --admin_email="developers@situationinteractive.com" >/dev/null 2>&1
   wp rewrite structure '/%postname%/' --url=${DDEV_PRIMARY_URL}
   wp rewrite flush --hard --url=${DDEV_PRIMARY_URL}
 fi
