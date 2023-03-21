@@ -2,12 +2,21 @@
 
 ## Description: Activate alternate build mode where the local dependencies are cleared and restored before the build.
 
-
 if [ -f .ddev/.plugin-dev-mode ]; then
-    rm -f .ddev/.plugin-dev-mode
-    echo "Plugin dev mode deactivated"
+  rm -f .ddev/.plugin-dev-mode
+  rm -f .conf/.ddev/mutagen/mutagen.yml
+  if [ -z "$(ls -A .conf/.ddev/mutagen)" ]; then
+    rm -rf .conf/.ddev/mutagen
+  fi
+  if [ -z "$(ls -A .conf/.ddev)" ]; then
+    rm -rf .conf/.ddev
+  fi
+  echo "Plugin dev mode deactivated"
 else
-    touch .ddev/.plugin-dev-mode
-    echo "Plugin dev mode activated"
+  touch .ddev/.plugin-dev-mode
+  mkdir -p .conf/.ddev/mutagen
+  cat .ddev/mutagen/mutagen.yml | grep -v "node_modules\|bower" >.conf/.ddev/mutagen/mutagen.yml
+  echo "Plugin dev mode activated"
 fi
-ddev mutagen sync
+ddev clean-build
+make
