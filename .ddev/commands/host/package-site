@@ -4,7 +4,7 @@ echo "Be sure your local environment is freshly pulled from production. If not, 
 echo ""
 baseDir="$(pwd)"
 read -p "Enter domain to replace ${DDEV_SITENAME}.${DDEV_TLD} in the database (enter to keep): " newDomain
-read -p "Enter location to save the export: [~/Downloads/${DDEV_SITENAME}/] " exportLocation
+read -p "Enter location to save the export: [../${DDEV_SITENAME}/] " exportLocation
 read -p "Include full WP core?: [y/N] " includeCoreResp
 if [[ $includeCoreResp = "y" ]]; then
   includeCore=1
@@ -15,7 +15,7 @@ rm -rf "${exportLocation}"
 mkdir -p "${exportLocation}"
 cd "${exportLocation}"
 exportLocation="$(pwd)"
-if [ ! -z "${includeCore}" ]; then
+if [ -n "${includeCore}" ]; then
   echo "Downloading WordPress core..."
   wget -q https://wordpress.org/latest.zip
   unzip -q latest.zip
@@ -24,7 +24,9 @@ if [ ! -z "${includeCore}" ]; then
   rm -rf httpdocs/wp-content
 fi
 mkdir -p httpdocs/wp-content
-cd httpdocs/wp-content
+cd httpdocs
+sed 's/wp_/sit_/g' "wp-config-sample.php" > "wp-config.php"
+cd wp-content
 [ -d "${baseDir}/wp-content/mu-plugins" ] && cp -r "${baseDir}/wp-content/mu-plugins" ./
 [ -d "${baseDir}/wp-content/plugins" ] && cp -r "${baseDir}/wp-content/plugins" ./
 [ -d "${baseDir}/wp-content/themes" ] && cp -r "${baseDir}/wp-content/themes" ./
@@ -50,7 +52,7 @@ const VIDEO_PRODUCER_YOUTUBE_API_KEY = '';
 EOT
 
 cd vendor/situation/scripts
-rm -rf composer.json cypress deploy docker percy src
+rm -rf composer.json cypress deploy docker percy src retarget
 cd "${exportLocation}"
 find * -type d -name "node_modules" -prune -exec rm -rf {} \;
 find * -type d -name "bower_components" -prune -exec rm -rf {} \;
@@ -63,13 +65,43 @@ cd httpdocs
 
 cd "$baseDir"
 ddev export-db --gzip=false --file="${exportLocation}/db-backup.sql"
+ddev mutagen sync
 echo "Doing search/replace..."
-ddev wp search-replace "${DDEV_SITENAME}.${DDEV_TLD}/wp" "${DDEV_SITENAME}.${DDEV_TLD}"
-ddev wp search-replace "${DDEV_SITENAME}.${DDEV_TLD}-c" "${DDEV_SITENAME}.${DDEV_TLD}/wp-c"
 
-if [ ! -z "${newDomain}" ]; then
-  ddev wp search-replace "${DDEV_SITENAME}.${DDEV_TLD}" "${newDomain}"
+ddev wp search-replace "${DDEV_SITENAME}.${DDEV_TLD}/wp" "${DDEV_SITENAME}.${DDEV_TLD}" --all-tables
+ddev wp search-replace "${DDEV_SITENAME}.${DDEV_TLD}-c" "${DDEV_SITENAME}.${DDEV_TLD}/wp-c" --all-tables
+
+if [ -n "${newDomain}" ]; then
+  echo "Replacing local domain with ${newDomain}"
+  ddev wp search-replace "${DDEV_SITENAME}.${DDEV_TLD}" "${newDomain}" --all-tables
 fi
 ddev export-db --gzip=false --file="${exportLocation}/db-export.sql"
 ddev import-db --src="${exportLocation}/db-backup.sql"
+ddev mutagen sync
 rm -f "${exportLocation}/db-backup.sql"
+cat <<EOT >"${exportLocation}/readme.md"
+# Site Setup Instructions
+
+## 1. Copying Package Content
+
+In a standard WordPress installation, copy the contents of the \`wp-content\` folder from the package into the appropriate folder in your installation.
+
+## 2. Importing the Database
+
+Import the provided database into your database server. Ensure that you update the database table prefix in \`wp-config.php\` to "sit_" instead of "wp_" if it isn’t already.
+
+## 3. Adjusting URLs for Alternative Environments
+
+When deploying the site to a staging or local environment, make sure to update the database URLs accordingly. You can use tools like WP CLI or [Interconnectit's Search Replace DB](https://github.com/interconnectit/Search-Replace-DB) to efficiently replace strings in the database without manual intervention. These tools ensure that serialized data remains intact during the URL update process.
+
+## 4. Site Constants Configuration
+
+A file located at \`wp-content/mu-plugins/constants.php\` contains constants used throughout the website. The first part of the file loads the Composer autoloader, which is used by the theme and custom plugins.
+
+The rest of the file sets various constants such as the environment (production, in this case), Gravity Forms license key, and Vimeo and YouTube API keys for video production. These constants are optional and can be set in the CMS if preferred.
+
+## 5. Building the Theme
+
+If changes are needed in the css or javascript, ensure Node.js version 12 is installed (eg \`nvm install 12\`) and navigate to the web root folder (\`httpdocs\`). Run \`yarn\` to install dependencies. Build the development version with \`yarn develop\`or the production version with \`yarn production\`. The compiled front-end code will be in the \`httpdocs/wp-content/themes/{custom-theme}/dist\`folder. Use \`yarn watch\` for live browser updates during development.
+
+EOT
