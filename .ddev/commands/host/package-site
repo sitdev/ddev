@@ -98,7 +98,7 @@ When deploying the site to a staging or local environment, make sure to update t
 
 A file located at \`wp-content/mu-plugins/constants.php\` contains constants used throughout the website. The first part of the file loads the Composer autoloader, which is used by the theme and custom plugins.
 
-The rest of the file sets various constants such as the environment (production, in this case), Gravity Forms license key, and Vimeo and YouTube API keys for video production. These constants are optional and can be set in the CMS if preferred.
+The rest of the file sets various constants such as the environment (production, in this case), Gravity Forms license key, and Vimeo and YouTube API keys for importing videos within the CMS. These constants are optional and can be set in the CMS if preferred.
 
 ## 5. Building the Theme
 
