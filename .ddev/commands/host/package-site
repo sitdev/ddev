@@ -32,6 +32,7 @@ cd wp-content
 [ -d "${baseDir}/wp-content/themes" ] && cp -r "${baseDir}/wp-content/themes" ./
 [ -d "${baseDir}/wp-content/uploads" ] && cp -r "${baseDir}/wp-content/uploads" ./
 [ -d "${baseDir}/wp-content/vendor" ] && cp -r "${baseDir}/wp-content/vendor" ./
+rm -rf uploads/wp-sync-db
 mkdir -p mu-plugins
 cat <<EOT >./mu-plugins/constants.php
 <?php
