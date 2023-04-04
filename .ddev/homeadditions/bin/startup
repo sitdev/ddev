@@ -14,7 +14,4 @@
   npm config set cache /mnt/ddev-global-cache/npm || true
   command -v replace >/dev/null 2>&1 || yarn global add replace
   grep -q "{{SITE_TITLE}}" README.md && replace "{{SITE_TITLE}}" "${SITE_TITLE}" ./README.md --silent || true
-  git clone git@github.com:situationinteractive/satis.git ~/satis
-  cp ~/satis/auth.json ~/.composer/
-  rm -rf ~/satis
 } >/dev/null 2>&1

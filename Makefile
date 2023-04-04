@@ -40,7 +40,7 @@ start: ## Turn on ddev
 		  ddev poweroff; \
 		fi; \
 		make self-update; \
-		ddev start && ddev auth ssh && make status; \
+		ddev start && ddev auth ssh && ddev composer-auth && make status; \
 	fi
 	
 stop: ## Shut down ddev
