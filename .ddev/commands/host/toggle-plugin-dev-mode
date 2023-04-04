@@ -4,7 +4,7 @@
 
 if [ -f .ddev/.plugin-dev-mode ]; then
   rm -f .ddev/.plugin-dev-mode
-  rm -f .conf/.ddev/mutagen/mutagen.yml
+  rm -f .conf/.ddev/mutagen/mutagen.yml .conf/.ddev/mutagen/.gitignore
   if [ -z "$(ls -A .conf/.ddev/mutagen)" ]; then
     rm -rf .conf/.ddev/mutagen
   fi
@@ -15,6 +15,7 @@ if [ -f .ddev/.plugin-dev-mode ]; then
 else
   touch .ddev/.plugin-dev-mode
   mkdir -p .conf/.ddev/mutagen
+  echo "/*" > .conf/.ddev/mutagen/.gitignore
   cat .ddev/mutagen/mutagen.yml | grep -v "node_modules\|bower" >.conf/.ddev/mutagen/mutagen.yml
   echo "Plugin dev mode activated"
 fi
