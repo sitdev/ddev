@@ -20,7 +20,8 @@ if [ ! -z "${SOFT_RESET}" ]; then
   find . -type d \( -path "**/node_modules/*situation*" \
   -o -path "**/node_modules/situation*" \
   -o -path "**/bower_components/set-design*" \
-  -o -path "**/bower_components/vc-library*" \) \
+  -o -path "**/bower_components/vc-library*" \
+  -o -path "**/bower_components/orchestrator*" \) \
   -prune | xargs -P 4 -I {} rm -rf {}
 else
   source $scriptRoot/yarn-lint
