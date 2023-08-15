@@ -60,9 +60,9 @@ if [ ! -z "${INITIAL_RUN}" ]; then
   wp option update page_on_front 2
 fi
 if is_multisite; then
-  wp plugin activate backstage wp-sync-db wp-sync-db-cli wp-sync-db-media-files --url=${DDEV_PRIMARY_URL} --network
+  wp plugin activate backstage advanced-custom-fields-pro wp-sync-db wp-sync-db-cli wp-sync-db-media-files --url=${DDEV_PRIMARY_URL} --network
 else
-  wp plugin activate backstage wp-sync-db wp-sync-db-cli wp-sync-db-media-files --url=${DDEV_PRIMARY_URL}
+  wp plugin activate backstage advanced-custom-fields-pro wp-sync-db wp-sync-db-cli wp-sync-db-media-files --url=${DDEV_PRIMARY_URL}
 fi
 
 if [ ! -z "${INITIAL_RUN}" ]; then
