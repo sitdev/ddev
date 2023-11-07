@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+
+proceed() {
+  read -p "WARNING: Any uncommitted changes will be lost, and database will be replaced with contents from the production environment. Do you want to proceed? (y/N) " -n 1 -r
+  echo
+  [[ $REPLY =~ ^[Yy]$ ]]
+}
+
+init() {
+  make start
+  ddev wp core is-installed >/dev/null 2>&1 || { ddev composer-install; ddev local-config; make container-sync; ddev local-init; }
+}
+
+reset() {
+  ddev hard-reset
+  git checkout master
+  git fetch --all
+  git pull origin master
+  make start
+}
+
+update() {
+  echo "Checking for updates..."
+  ddev composer config platform.php 7.4
+  updates=$(ddev composer update -o --no-install 2>&1)
+  items=$(echo "${updates}" | grep "Upgrading")
+  echo "$items"
+}
+
+hotfix() {
+  if [[ "$updates" != *"Nothing to modify in lock file"* ]]; then
+    git branch -D hotfix/update >/dev/null 2>&1
+    git checkout -b hotfix/update
+    ddev composer-install
+    ddev run-migration pull-production
+    make production
+    git add -A .
+    git commit -m "Composer update" -m "$items"
+    ddev visual-compare
+  fi
+}
+
+if proceed; then
+  init
+  reset
+  update
+  hotfix
+fi
