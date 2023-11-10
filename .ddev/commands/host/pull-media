@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+
+# Function to check if a given command exists
+check_command_existence() {
+  command -v "$1" &>/dev/null
+}
+
+# Function to validate SSH connection using a custom config
+validate_ssh_connection() {
+  local ssh_config_file="$1/config/host-config"
+  [[ -f "$ssh_config_file" ]] && ssh -o BatchMode=yes -v -F "$ssh_config_file" "$2" 2>&1 | grep -q "Connection established."
+}
+
+# Exit script if not running on macOS
+[[ "$(uname)" != "Darwin" ]] && exit
+
+# Consolidated check for required commands
+check_command_existence brew || exit
+check_command_existence git || exit
+
+# Clone the repository to a temporary directory
+temporary_directory=$(mktemp -d)
+cleanup_temporary_directory() { rm -rf "$temporary_directory"; }
+trap cleanup_temporary_directory EXIT INT TERM
+
+git clone git@github.com:sitdev/workflow-support.git "$temporary_directory" &>/dev/null || exit
+
+# Ensure sshpass is installed using Brew
+check_command_existence sshpass || { brew tap esolitos/ipa &>/dev/null && brew install esolitos/ipa/sshpass &>/dev/null; }
+
+# Function to retrieve the repository name
+get_repository_name() {
+  basename -s .git "$(git config --get remote.origin.url)" 2>/dev/null || exit
+}
+
+repository_name=$(get_repository_name)
+repository_config_directory="$temporary_directory/config/$repository_name"
+
+# Check if the repository configuration directory exists
+[[ -d "$repository_config_directory" ]] || exit
+
+echo "Pull the media library first? Choose a deployment profile or press enter to continue."
+
+# Listing deployment profiles
+deployment_profiles=($(ls "$repository_config_directory"))
+
+# Displaying deployment profiles
+for i in "${!deployment_profiles[@]}"; do
+    echo "$((i+1))) ${deployment_profiles[i]}"
+done
+
+# Handling user input for profile selection
+while true; do
+    read -p "Enter your choice (or press enter to continue): " user_choice
+
+    if [ -z "$user_choice" ]; then
+        exit
+    elif [[ $user_choice =~ ^[0-9]+$ ]] && [ "$user_choice" -le "${#deployment_profiles[@]}" ] && [ "$user_choice" -gt 0 ]; then
+        selected_profile=${deployment_profiles[$((user_choice-1))]}
+        break
+    else
+        exit
+    fi
+done
+
+selected_directory="$repository_config_directory/$selected_profile"
+
+# Verify the presence of build.txt
+[[ -f "$selected_directory/build.txt" ]] || exit
+
+# Reading required variables from build.txt
+eval $(grep "HOST\|USER\|PASS\|WEBROOT" "$selected_directory/build.txt")
+
+# Validate SSH connection
+validate_ssh_connection "$temporary_directory" "${USER}@${HOST}" || exit
+
+# Syncing content using rsync and sshpass
+sshpass -p "${PASS}" rsync -rzvh --delete \
+  --exclude "uploads/wp-sync-db" \
+  --exclude "uploads/cache" \
+  --exclude "uploads/js_composer" \
+  --exclude "uploads/gravity_forms" \
+  -e ssh "${USER}@${HOST}:${WEBROOT}/wp-content/uploads" ./wp-content/

@@ -73,6 +73,9 @@ update: start ## Composer update
 	@ddev platform-update
 	@[ -z "$$(make self-update)" ] || make restart
 
+update-review: ## Full reset and update process with manual comparison against a remote install for code changes and visual regression.
+	@ddev update-review
+
 self-update: ## Update Situation ddev config from remote repository. Branch is defined by $UPDATE_BRANCH.
 	@[ -z ${UPDATE_BRANCH} ] || /bin/bash -c "$$(curl -fsSL https://raw.githubusercontent.com/sitdev/ddev/main/install.sh)" -- "${UPDATE_BRANCH}" 
 

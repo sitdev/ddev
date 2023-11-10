@@ -20,9 +20,8 @@ colima start --cpu 4 --memory 6 --disk 100 --mount "/Volumes/my-project-parent:w
 ### DDEV
 ```shell
 brew install drud/ddev/ddev
-brew install nss
 mkcert -install
-ddev config global --mutagen-enabled
+ddev config global --performance-mode mutagen
 ```
 
 ### First Run

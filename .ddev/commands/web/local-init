@@ -19,7 +19,7 @@ while getopts "i" option; do
 done
 
 USER_PASS=test
-if [ ! -z "${INITIAL_RUN}" ]; then
+if [ -n "${INITIAL_RUN}" ]; then
   read -p "sit-admin password: [test] " USER_PASS
   USER_PASS=${USER_PASS:-test}
 fi
@@ -51,7 +51,7 @@ else
 fi
 wp user update sit-admin --user_pass=${USER_PASS}
 echo "Set default password: ${USER_PASS}"
-if [ ! -z "${INITIAL_RUN}" ]; then
+if [ -n "${INITIAL_RUN}" ]; then
   wp option update timezone_string "America/New_York"
   wp option delete blogdescription comments_notify default_comment_status default_ping_status default_pingback_flag comment_moderation moderation_notify comment_registration show_avatars close_comments_for_old_posts page_comments
   wp post delete 1 --force
@@ -65,7 +65,7 @@ else
   wp plugin activate backstage advanced-custom-fields-pro wp-sync-db wp-sync-db-cli wp-sync-db-media-files --url=${DDEV_PRIMARY_URL}
 fi
 
-if [ ! -z "${INITIAL_RUN}" ]; then
+if [ -n "${INITIAL_RUN}" ]; then
   echo "Getting plugin list..."
   pluginList=$(wp plugin list --fields=name,title --format=csv --status=inactive --url=${DDEV_PRIMARY_URL})
   options=()

@@ -43,7 +43,7 @@ ddev mutagen sync
 cd $targetDir
 localDomain=$(cat local-domain.txt)
 [ -f remote-domain.txt ] && remoteDomain=$(cat remote-domain.txt) || true
-read -p "Enter remote domain: [${remoteDomain}] " newRemoteDomain
+read -p "Enter full remote url: [${remoteDomain}] " newRemoteDomain
 remoteDomain=${newRemoteDomain:-${remoteDomain}}
 remoteDomain=$(echo "${remoteDomain}" | sed 's:/*$::')
 echo "${remoteDomain}" >remote-domain.txt
