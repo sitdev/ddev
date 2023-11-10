@@ -8,7 +8,7 @@ check_command_existence() {
 # Function to validate SSH connection using a custom config
 validate_ssh_connection() {
   local ssh_config_file="$1/config/host-config"
-  [[ -f "$ssh_config_file" ]] && ssh -o BatchMode=yes -v -F "$ssh_config_file" "$2" 2>&1 | grep -q "Connection established."
+  [[ -f "$ssh_config_file" ]] && ssh -o BatchMode=yes -o ConnectTimeout=2 -v -F "$ssh_config_file" "$2" 2>&1 | grep -q "Connection established."
 }
 
 # Exit script if not running on macOS
@@ -26,7 +26,7 @@ trap cleanup_temporary_directory EXIT INT TERM
 git clone git@github.com:sitdev/workflow-support.git "$temporary_directory" &>/dev/null || exit
 
 # Ensure sshpass is installed using Brew
-check_command_existence sshpass || { brew tap esolitos/ipa &>/dev/null && brew install esolitos/ipa/sshpass &>/dev/null; }
+check_command_existence sshpass || { brew tap esolitos/ipa && brew install esolitos/ipa/sshpass; }
 
 # Function to retrieve the repository name
 get_repository_name() {
