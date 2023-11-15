@@ -8,7 +8,7 @@ check_command_existence() {
 # Function to validate SSH connection using a custom config
 validate_ssh_connection() {
   local ssh_config_file="$1/config/host-config"
-  [[ -f "$ssh_config_file" ]] && ssh -o BatchMode=yes -v -F "$ssh_config_file" "$2" 2>&1 | grep -q "Connection established."
+  [[ -f "$ssh_config_file" ]] && ssh -o BatchMode=yes -o ConnectTimeout=2 -v -F "$ssh_config_file" "$2" 2>&1 | grep -q "Connection established."
 }
 
 # Exit script if not running on macOS
@@ -26,7 +26,7 @@ trap cleanup_temporary_directory EXIT INT TERM
 git clone git@github.com:sitdev/workflow-support.git "$temporary_directory" &>/dev/null || exit
 
 # Ensure sshpass is installed using Brew
-check_command_existence sshpass || { brew tap esolitos/ipa &>/dev/null && brew install esolitos/ipa/sshpass &>/dev/null; }
+check_command_existence sshpass || { brew tap esolitos/ipa && brew install esolitos/ipa/sshpass &>/dev/null; }
 
 # Function to retrieve the repository name
 get_repository_name() {
@@ -75,9 +75,10 @@ eval $(grep "HOST\|USER\|PASS\|WEBROOT" "$selected_directory/build.txt")
 validate_ssh_connection "$temporary_directory" "${USER}@${HOST}" || exit
 
 # Syncing content using rsync and sshpass
-sshpass -p "${PASS}" rsync -rzvh --delete \
+sshpass -p "${PASS}" rsync -rvh --size-only --delete \
   --exclude "uploads/wp-sync-db" \
   --exclude "uploads/cache" \
   --exclude "uploads/js_composer" \
   --exclude "uploads/gravity_forms" \
-  -e ssh "${USER}@${HOST}:${WEBROOT}/wp-content/uploads" ./wp-content/
+  -e "ssh -F $temporary_directory/config/host-config" \
+  "${USER}@${HOST}:${WEBROOT}/wp-content/uploads" ./wp-content/
