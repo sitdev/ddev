@@ -90,9 +90,11 @@ migration: ## Start Migration dialog to create new or run existing migrations
 	@ddev migration
 
 pull-staging: ## Run a pre-defined WP Migrate DB profile to pull the staging environment
+	@ddev pull-media
 	@ddev run-migration pull-staging
 
 pull-production: ## Run a pre-defined WP Migrate DB profile to pull the production environment
+	@ddev pull-media
 	@ddev run-migration pull-production
 
 test: 
