@@ -39,29 +39,39 @@ repository_config_directory="$temporary_directory/config/$repository_name"
 # Check if the repository configuration directory exists
 [[ -d "$repository_config_directory" ]] || exit
 
-echo "Pull the media library first? Choose a deployment profile or press enter to continue."
-
 # Listing deployment profiles
 deployment_profiles=($(ls "$repository_config_directory"))
 
-# Displaying deployment profiles
-for i in "${!deployment_profiles[@]}"; do
-    echo "$((i+1))) ${deployment_profiles[i]}"
-done
+# Check if a command line argument is provided and valid
+selected_profile=""
+if [ "$#" -gt 0 ]; then
+    for profile in "${deployment_profiles[@]}"; do
+        if [ "$1" == "$profile" ]; then
+            selected_profile="$1"
+            break
+        fi
+    done
+fi
 
-# Handling user input for profile selection
-while true; do
-    read -p "Enter your choice (or press enter to continue): " user_choice
+# Displaying deployment profiles and handling user input if no valid argument was provided
+if [ -z "$selected_profile" ]; then
+    for i in "${!deployment_profiles[@]}"; do
+        echo "$((i+1))) ${deployment_profiles[i]}"
+    done
 
-    if [ -z "$user_choice" ]; then
-        exit
-    elif [[ $user_choice =~ ^[0-9]+$ ]] && [ "$user_choice" -le "${#deployment_profiles[@]}" ] && [ "$user_choice" -gt 0 ]; then
-        selected_profile=${deployment_profiles[$((user_choice-1))]}
-        break
-    else
-        exit
-    fi
-done
+    while true; do
+        read -p "Choose a deployment profile (or press enter to skip): " user_choice
+
+        if [ -z "$user_choice" ]; then
+            exit
+        elif [[ $user_choice =~ ^[0-9]+$ ]] && [ "$user_choice" -le "${#deployment_profiles[@]}" ] && [ "$user_choice" -gt 0 ]; then
+            selected_profile=${deployment_profiles[$((user_choice-1))]}
+            break
+        else
+            exit
+        fi
+    done
+fi
 
 selected_directory="$repository_config_directory/$selected_profile"
 
