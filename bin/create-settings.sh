@@ -45,21 +45,10 @@ if [ -z "${NODE_VER}" ]; then
   NODE_VER=${NODE_VER:-${node_guess}}
 fi
 
-if [ -z "${ADDITIONAL_HOSTS}" ]; then
-  echo "Additional Multisite hosts"
-  read -p "(separate by space, no protocol or TLD - eg \"situationuk townhall situationgroup\": " ADDITIONAL_HOSTS
-fi
-
 cat <<EOT >$settings_file
 SITE_NAME="${SITE_NAME}"
 SITE_TITLE="${SITE_TITLE}"
 NODE_VER="${NODE_VER}"
 EOT
-
-if [ ! -z "${ADDITIONAL_HOSTS}" ]; then
-  cat <<EOT >>$settings_file
-ADDITIONAL_HOSTS="${ADDITIONAL_HOSTS}"
-EOT
-fi
 
 source $settings_file
