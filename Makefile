@@ -1,29 +1,21 @@
 # Situation DDEV
 # Version: 0.0.1
 
-UPDATE_BRANCH="main"
+UPDATE_BRANCH="static"
 .PHONY: *
 
 all: develop
-	@ddev wp core is-installed >/dev/null 2>&1 || make local-init
-	@printf "\nEnter \033[36mmake help\033[0m for more info\n\n"
 
-develop: start install build container-sync ## Turn on ddev and run build (default)
-production: start install-production build-production container-sync ## Create the production build
+develop: start
+production: start
 
-install: ## Install all dev dependencies
-	@ddev composer-install
-	@ddev yarn-install
+install: 
 
 install-production:
-	@ddev composer install -o --no-dev
-	@ddev yarn-install
 
-build: ## Run front-end dev build
-	@ddev yarn-build
+build:
 
 build-production:
-	@ddev yarn-build production
 
 start: ## Turn on ddev
 	@if ! docker info >/dev/null 2>&1; then \
@@ -55,53 +47,34 @@ container-sync:
 	@echo "Syncing mutagen container..."
 	@make running 2>/dev/null && ddev mutagen sync || ddev mutagen reset
 
-watch: ## Start the watch task
-	@ddev yarn-watch
+watch:
 	
 logging: ## Tail the ddev log
 	@ddev log-tail
 
-clean: ## Clean build
-	@isRunning="$$(ddev exec pwd 2>/dev/null)"; \
-	/bin/bash .ddev/commands/host/clean-build; \
-	[ -z "$${isRunning}" ] || make start
+clean:
 
-reset: self-update ## Clean build and git hard reset/pull
-	@/bin/bash .ddev/commands/host/hard-reset
+reset: self-update
 
-update: start ## Composer update
-	@ddev platform-update
-	@[ -z "$$(make self-update)" ] || make restart
+update: start
 
-update-review: ## Full reset and update process with manual comparison against a remote install for code changes and visual regression.
-	@ddev update-review
+update-review: 
 
 self-update: ## Update Situation ddev config from remote repository. Branch is defined by $UPDATE_BRANCH.
 	@[ -z ${UPDATE_BRANCH} ] || /bin/bash -c "$$(curl -fsSL https://raw.githubusercontent.com/sitdev/ddev/main/install.sh)" -- "${UPDATE_BRANCH}" 
 
-local-init: start ## Initialize local WP database using basic defaults
-	@ddev composer-install
-	@ddev local-config
-	@make container-sync
-	@ddev local-init
-	@ddev migration
+local-init: start
 
-migration: ## Start Migration dialog to create new or run existing migrations
-	@ddev migration
+migration:
 
-pull-staging: ## Run a pre-defined WP Migrate DB profile to pull the staging environment
-	@ddev pull-media develop
-	@ddev run-migration pull-staging
+pull-staging:
 
-pull-production: ## Run a pre-defined WP Migrate DB profile to pull the production environment
-	@ddev pull-media master
-	@ddev run-migration pull-production
+pull-production:
 
 test: 
 	@ddev test-phpunit
 
-plugin-dev-mode: ## Toggles an alternate build process which clears and re-installs all Situation node_modules content before each build.
-	@/bin/bash .ddev/commands/host/toggle-plugin-dev-mode
+plugin-dev-mode:
 
 status: ## Show project status and tools
 	@ddev status
