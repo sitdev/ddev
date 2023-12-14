@@ -45,7 +45,7 @@ if [ -z "${NODE_VER}" ]; then
   NODE_VER=${NODE_VER:-${node_guess}}
 fi
 
-if is_multisite && [ -z "${ADDITIONAL_HOSTS}" ]; then
+if [ -z "${ADDITIONAL_HOSTS}" ]; then
   echo "Additional Multisite hosts"
   read -p "(separate by space, no protocol or TLD - eg \"situationuk townhall situationgroup\": " ADDITIONAL_HOSTS
 fi
