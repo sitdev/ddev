@@ -25,8 +25,8 @@ cat <<EOT >package.json
     }
 }
 EOT
-nvm install 16 >/dev/null 2>&1 || true
-nvm use 16 >/dev/null 2>&1 || true
+nvm install 20 >/dev/null 2>&1 || true
+nvm use 20 >/dev/null 2>&1 || true
 yarn
 if [ ! -f sitemap.xml ]; then
   yarn build-sitemap

@@ -13,7 +13,7 @@ guess_node_ver() {
   elif [ "$(find wp-content/themes -maxdepth 2 -name package.json -exec grep -rl "situation/webpack" {} \;)" ]; then
     node_ver=12
   else
-    node_ver=16
+    node_ver=20
   fi
   echo "$node_ver"
 }
