@@ -1,7 +1,7 @@
 project_tld: test
 type: php
 docroot: ""
-php_version: "8.1"
+php_version: "8.2"
 webserver_type: apache-fpm
 webimage_extra_packages: [libglu1,libxi6,libgconf-2-4,make,g++,dialog]
 router_http_port: "80"
