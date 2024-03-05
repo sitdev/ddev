@@ -19,5 +19,7 @@ else
   cat .ddev/mutagen/mutagen.yml | grep -v "node_modules\|bower" >.conf/.ddev/mutagen/mutagen.yml
   echo "Plugin dev mode activated"
 fi
+rm -f composer.lock
 ddev clean-build
 make
+git add composer.lock
