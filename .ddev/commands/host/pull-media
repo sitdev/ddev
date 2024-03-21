@@ -88,6 +88,7 @@ validate_ssh_connection "$temporary_directory" "${USER}@${HOST}" || exit
 sshpass -p "${PASS}" rsync -rvh --size-only --delete \
   --exclude "uploads/wp-sync-db" \
   --exclude "uploads/cache" \
+  --exclude "uploads/backup" \
   --exclude "uploads/js_composer" \
   --exclude "uploads/gravity_forms" \
   -e "ssh -F $temporary_directory/config/host-config" \
