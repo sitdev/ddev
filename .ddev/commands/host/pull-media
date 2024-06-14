@@ -79,7 +79,7 @@ selected_directory="$repository_config_directory/$selected_profile"
 [[ -f "$selected_directory/build.txt" ]] || exit
 
 # Reading required variables from build.txt
-eval $(grep "HOST\|USER\|PASS\|WEBROOT" "$selected_directory/build.txt")
+eval $(grep "^export.*\(HOST\|USER\|PASS\|WEBROOT\)" "$selected_directory/build.txt")
 
 # Validate SSH connection
 validate_ssh_connection "$temporary_directory" "${USER}@${HOST}" || exit
@@ -88,6 +88,7 @@ validate_ssh_connection "$temporary_directory" "${USER}@${HOST}" || exit
 sshpass -p "${PASS}" rsync -rvh --size-only --delete \
   --exclude "uploads/wp-sync-db" \
   --exclude "uploads/cache" \
+  --exclude "uploads/backu*" \
   --exclude "uploads/js_composer" \
   --exclude "uploads/gravity_forms" \
   -e "ssh -F $temporary_directory/config/host-config" \
