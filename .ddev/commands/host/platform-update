@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 
 ## Description: Update composer dependencies and rebuild yarn cache if needed.
-source .conf/.env
-echo "Checking for updates..."
+
 ddev composer config platform.php 7.4
 if grep -q '"kint-php/kint": "^2.0"' composer.json; then
     ddev composer config extra.kint --unset

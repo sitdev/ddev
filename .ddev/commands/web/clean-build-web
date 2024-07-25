@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+## Description: Clean all build files and installed dependencies.
+
+rm -rf wp-content/vendor wp-content/plugins wp wp-content/themes/orchestrator node_modules
+find wp-content/themes -type d \( -name "node_modules" -o -name "bower_components" -o -name "dist" \) -prune | xargs -P 4 -I {} rm -rf {}
