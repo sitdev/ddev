@@ -8,15 +8,5 @@ if grep -q '"kint-php/kint": "^2.0"' composer.json; then
     ddev composer config extra.kint --unset
     ddev composer require --dev kint-php/kint:"*" --no-install
 fi
-updates=$(ddev composer update -o --no-install 2>&1)
-echo "${updates}"
-if [[ "$updates" != *"Nothing to modify in lock file"* ]]; then
-  ddev composer-install
-fi
-if [[ "$updates" == *"set-design"* ]] || [[ "$updates" == *"vc-library"* ]] || [[ "$updates" == *"situation/scripts"* ]] || [[ "$updates" == *"quiz-builder"* ]]; then
-  touch .ddev/.updated
-  echo "Found platform updates, rebuilding yarn cache..."
-  ddev yarn-install
-  rm -f .ddev/.updated
-fi
+ddev composer update -o --no-install
 ddev mutagen sync
