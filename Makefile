@@ -72,7 +72,9 @@ reset: self-update ## Clean build and git hard reset/pull
 update: start ## Composer update
 	@ddev platform-update
 	@make self-update
-	@make restart
+	@make stop
+	@make clean
+	@make develop
 
 update-review: ## Full reset and update process with manual comparison against a remote install for code changes and visual regression.
 	@ddev update-review
