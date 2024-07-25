@@ -62,19 +62,14 @@ logging: ## Tail the ddev log
 	@ddev log-tail
 
 clean: ## Clean build
-	@isRunning="$$(ddev exec pwd 2>/dev/null)"; \
-	/bin/bash .ddev/commands/host/clean-build; \
-	[ -z "$${isRunning}" ] || make start
+	@ddev clean-build
 
 reset: self-update ## Clean build and git hard reset/pull
 	@/bin/bash .ddev/commands/host/hard-reset
 
-update: start ## Composer update
+update: clean start ## Composer update
 	@ddev platform-update
-	@make self-update
-	@make stop
-	@make clean
-	@make develop
+	@make
 
 update-review: ## Full reset and update process with manual comparison against a remote install for code changes and visual regression.
 	@ddev update-review
