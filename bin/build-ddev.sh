@@ -18,4 +18,3 @@ done
 fi
 
 [ -d .conf/.ddev ] && cp -r .conf/.ddev/ .ddev || true
-ddev mutagen sync >/dev/null 2>&1 || true
