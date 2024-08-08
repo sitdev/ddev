@@ -1,7 +1,7 @@
 # Situation DDEV
 # Version: 0.0.1
 
-UPDATE_BRANCH="main"
+UPDATE_BRANCH="v1.23.4"
 .PHONY: *
 
 all: develop
