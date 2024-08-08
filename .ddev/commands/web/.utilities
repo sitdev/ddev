@@ -44,7 +44,7 @@ buildYarn() {
       [ -z "${isProduction}" ] && yarn develop || yarn production
     fi
     if [ -f gulpfile.js ]; then
-      [ -z "${isProduction}" ] && gulp || gulp --production
+      [ -z "${isProduction}" ] && yarn gulp || yarn gulp --production
     fi
   fi
 }
@@ -55,7 +55,7 @@ watchYarn() {
       yarn watch
     fi
     if [ -f gulpfile.js ]; then
-      gulp watch
+      yarn gulp watch
     fi
   fi
 }
