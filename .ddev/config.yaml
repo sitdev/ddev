@@ -3,7 +3,7 @@ type: php
 docroot: ""
 php_version: "8.2"
 webserver_type: apache-fpm
-webimage_extra_packages: [libglu1,libxi6,libgconf-2-4,make,g++,dialog]
+webimage_extra_packages: [dialog]
 router_http_port: "80"
 router_https_port: "443"
 xdebug_enabled: false
