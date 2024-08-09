@@ -2,6 +2,15 @@
 
 ## Description: Clean all build files and installed dependencies.
 
-rm -rf wp-content/vendor wp-content/plugins wp wp-content/themes/orchestrator node_modules
-find wp-content/themes -type d \( -name "node_modules" -o -name "bower_components" -o -name "dist" \) -prune | xargs -P 4 -I {} rm -rf {}
-ddev mutagen reset
+is_running() {
+    ddev exec pwd &>/dev/null
+}
+echo "Cleaning build dependencies..."
+if is_running; then
+  ddev clean-build-web
+  bash ./.ddev/commands/web/clean-build-web
+  ddev mutagen sync
+else
+  bash ./.ddev/commands/web/clean-build-web
+  ddev mutagen reset
+fi

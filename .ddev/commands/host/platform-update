@@ -1,18 +1,20 @@
 #!/usr/bin/env bash
 
 ## Description: Update composer dependencies and rebuild yarn cache if needed.
-source .conf/.env
-echo "Checking for updates..."
+
 ddev composer config platform.php 7.4
-updates=$(ddev composer update -o --no-install 2>&1)
-echo "${updates}"
-if [[ "$updates" != *"Nothing to modify in lock file"* ]]; then
-  ddev composer-install
+if grep -q '"kint-php/kint": "^2.0"' composer.json; then
+    ddev composer config extra.kint --unset
+    ddev composer require --dev kint-php/kint:"*" --no-install
 fi
-if [[ "$updates" == *"set-design"* ]] || [[ "$updates" == *"vc-library"* ]] || [[ "$updates" == *"situation/scripts"* ]] || [[ "$updates" == *"quiz-builder"* ]]; then
-  touch .ddev/.updated
-  echo "Found platform updates, rebuilding yarn cache..."
-  ddev yarn-install
-  rm -f .ddev/.updated
+if grep -q 'situation/advanced-custom-fields-pro' composer.json; then
+  ddev mutagen sync
+  ddev ssh -- <<EOF
+  jq --indent 4 '.repositories += [{"type":"composer","url":"https://connect.advancedcustomfields.com"}]' ./composer.json > ./composer.tmp && mv ./composer.tmp ./composer.json
+  composer remove situation/advanced-custom-fields-pro --no-install
+  composer require wpengine/advanced-custom-fields-pro:"*" --no-install
+EOF
+  ddev mutagen sync
 fi
+ddev composer update -o --no-install
 ddev mutagen sync

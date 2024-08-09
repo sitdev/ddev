@@ -48,9 +48,6 @@ stop: ## Shut down ddev
 
 restart: stop start ## Restart ddev
 
-shutdown: stop ## Clean build, full shutdown of ddev/colima
-	-@colima stop
-
 container-sync:
 	@echo "Syncing mutagen container..."
 	@make running 2>/dev/null && ddev mutagen sync || ddev mutagen reset
@@ -62,17 +59,16 @@ logging: ## Tail the ddev log
 	@ddev log-tail
 
 clean: ## Clean build
-	@isRunning="$$(ddev exec pwd 2>/dev/null)"; \
-	/bin/bash .ddev/commands/host/clean-build; \
-	[ -z "$${isRunning}" ] || make start
+	@ddev clean-build
 
-reset: self-update ## Clean build and git hard reset/pull
-	@/bin/bash .ddev/commands/host/hard-reset
-
-update: start ## Composer update
-	@ddev platform-update
+reset: ## Clean build and git hard reset/pull
+	-@ddev stop
 	@make self-update
-	@make restart
+	@ddev hard-reset
+
+update: clean start ## Composer update
+	@ddev platform-update
+	@make
 
 update-review: ## Full reset and update process with manual comparison against a remote install for code changes and visual regression.
 	@ddev update-review
