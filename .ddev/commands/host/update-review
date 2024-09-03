@@ -21,7 +21,6 @@ reset() {
 
 update() {
   echo "Checking for updates..."
-  ddev composer config platform.php 7.4
   updates=$(ddev composer update -o --no-install 2>&1)
   items=$(echo "${updates}" | grep "Upgrading")
   echo "$items"
