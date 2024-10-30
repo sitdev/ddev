@@ -1,5 +1,41 @@
 #!/usr/bin/env bash
+
 ## Description: Clean all build files and installed dependencies.
 
-rm -rf wp-content/vendor wp-content/plugins wp wp-content/themes/orchestrator node_modules
-find wp-content/themes -type d \( -name "node_modules" -o -name "bower_components" -o -name "dist" \) -prune | xargs -P 4 -I {} rm -rf {}
+clean_directories() {
+  local dirs=(
+    "wp-content/vendor"
+    "wp-content/plugins"
+    "wp"
+    "wp-content/themes/orchestrator"
+    "wp-content/themes/sitchco-parent-theme"
+    "node_modules"
+  )
+  for dir in "${dirs[@]}"; do
+    rm -rf "$dir"
+  done
+}
+
+clean_theme_directories() {
+  find wp-content/themes -type d \( -name "node_modules" -o -name "bower_components" -o -name "dist" \) -prune -exec rm -rf {} +
+}
+
+clean_mu_plugins() {
+  local mu_plugins_dir="wp-content/mu-plugins"
+  [ ! -d "$mu_plugins_dir" ] && return 0
+
+  local ignored_files
+  ignored_files=$(git -C "$mu_plugins_dir" ls-files --ignored --exclude-standard --others)
+  [ -z "$ignored_files" ] && return 0
+
+  for file in $ignored_files; do
+    local full_path="$mu_plugins_dir/$file"
+    [ -e "$full_path" ] && rm -rf "$full_path"
+  done
+
+  find "$mu_plugins_dir" -depth -type d -empty -exec rmdir {} +
+}
+
+clean_directories
+clean_theme_directories
+clean_mu_plugins
