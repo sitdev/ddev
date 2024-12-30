@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+check_command_existence() {
+  command -v "$1" &>/dev/null
+}
+
+[[ "$(uname)" != "Darwin" ]] && exit
+
+temporary_directory=$(mktemp -d)
+cleanup_temporary_directory() { rm -rf "$temporary_directory"; }
+trap cleanup_temporary_directory EXIT INT TERM
+
+git clone git@github.com:sitdev/workflow-support.git "$temporary_directory" &>/dev/null || exit
+
+check_command_existence sshpass || { brew tap esolitos/ipa && brew install esolitos/ipa/sshpass &>/dev/null; }
+
+bash "${temporary_directory}/transfer-site/main.sh"
+
+cleanup_temporary_directory
