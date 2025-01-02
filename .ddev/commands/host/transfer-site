@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 
+## Description: Stage or manage the site staging environment for remote server transfer
+## Usage: transfer-site [flags]
+## Example: ddev transfer-site\nddev transfer-site --form-entries\nddev transfer-site --reset
+## OSTypes: darwin
+## Flags: [{"Name":"form-entries","Usage":"Populate the transfer staging with the latest form entries"},{"Name":"reset","Usage":"Reset the transfer environment after transfer is complete"}]
+
 check_command_existence() {
   command -v "$1" &>/dev/null
 }
