@@ -13,7 +13,19 @@ trap cleanup_temporary_directory EXIT INT TERM
 git clone git@github.com:sitdev/workflow-support.git "$temporary_directory" &>/dev/null || exit
 
 check_command_existence sshpass || { brew tap esolitos/ipa && brew install esolitos/ipa/sshpass &>/dev/null; }
+for arg in "$@"; do
+    case $arg in
+        --form-entries)
+            bash "${temporary_directory}/bin/transfer-site/form-entries.sh"
+            exit
+            ;;
+        --reset)
+            bash "${temporary_directory}/bin/transfer-site/reset-staging.sh"
+            exit
+            ;;
+    esac
+done
 
-bash "${temporary_directory}/transfer-site/main.sh"
+bash "${temporary_directory}/bin/transfer-site/main.sh"
 
 cleanup_temporary_directory
