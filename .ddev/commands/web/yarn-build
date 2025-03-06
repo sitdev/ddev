@@ -23,8 +23,6 @@ if [ ! -z "${SOFT_RESET}" ]; then
   -o -path "**/bower_components/vc-library*" \
   -o -path "**/bower_components/orchestrator*" \) \
   -prune | xargs -P 4 -I {} rm -rf {}
-else
-  source $scriptRoot/yarn-lint
 fi
 
 for buildDir in $buildDirs; do
