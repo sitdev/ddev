@@ -78,6 +78,7 @@ process_theme_dirs() {
             cleanup_artifacts "${theme_dir}"
             cp ./package.json "${theme_dir}/"
             cp ./webpack.config.js "${theme_dir}/"
+            echo "20" > "${theme_dir}/.nvmrc"
             # Update main.js imports if it exists
             local main_js="${theme_dir}/assets/scripts/main.js"
             if [[ -f "$main_js" ]]; then
