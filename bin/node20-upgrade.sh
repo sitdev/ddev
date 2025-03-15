@@ -50,6 +50,7 @@ update_config_files() {
         echo "Error updating Makefile" >&2
         return 1
     }
+    sed -i '' "s/github-runner/php8/g" ./.github/workflows/main.yml
     echo "Updated configuration files"
 }
 
