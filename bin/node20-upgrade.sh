@@ -51,6 +51,7 @@ update_config_files() {
         return 1
     }
     sed -i '' "s/github-runner/php8/g" ./.github/workflows/main.yml
+    ddev composer config platform --unset
     echo "Updated configuration files"
 }
 
