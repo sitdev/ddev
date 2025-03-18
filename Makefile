@@ -76,6 +76,9 @@ update-review: ## Full reset and update process with manual comparison against a
 self-update: ## Update Situation ddev config from remote repository. Branch is defined by $UPDATE_BRANCH.
 	@[ -z ${UPDATE_BRANCH} ] || /bin/bash -c "$$(curl -fsSL https://raw.githubusercontent.com/sitdev/ddev/main/install.sh)" -- "${UPDATE_BRANCH}" 
 
+node20-upgrade:
+	@/bin/bash -c "$$(curl -fsSL https://raw.githubusercontent.com/sitdev/ddev/main/bin/node20-upgrade.sh)"
+
 local-init: start ## Initialize local WP database using basic defaults
 	@ddev composer-install
 	@ddev local-config
