@@ -42,6 +42,7 @@ start: ## Turn on ddev
 		make self-update; \
 		ddev start && ddev auth ssh && ddev composer-auth && make status; \
 	fi
+	@ddev validate-architecture
 	
 stop: ## Shut down ddev
 	-@ddev poweroff
