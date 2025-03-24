@@ -3,4 +3,3 @@ services:
     environment:
       - YARN_CACHE_FOLDER=/mnt/ddev-global-cache/yarn
       - npm_config_cache=/mnt/ddev-global-cache/npm
-      - PNPM_STORE_PATH=/mnt/ddev-global-cache/pnpm-store
