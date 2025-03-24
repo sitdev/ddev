@@ -6,5 +6,8 @@ services:
       - pnpm-store:/home/node/.pnpm-store
 volumes:
   yarn-cache:
+    external: true
   npm-cache:
+    external: true
   pnpm-store:
+    external: true
