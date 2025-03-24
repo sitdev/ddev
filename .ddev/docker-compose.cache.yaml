@@ -1,13 +1,6 @@
 services:
   web:
-    volumes:
-      - yarn-cache:/home/node/.cache/yarn
-      - npm-cache:/home/node/.npm
-      - pnpm-store:/home/node/.pnpm-store
-volumes:
-  yarn-cache:
-    external: true
-  npm-cache:
-    external: true
-  pnpm-store:
-    external: true
+    environment:
+      - YARN_CACHE_FOLDER=/mnt/ddev-global-cache/yarn
+      - npm_config_cache=/mnt/ddev-global-cache/npm
+      - PNPM_STORE_PATH=/mnt/ddev-global-cache/pnpm-store
