@@ -1,2 +1,2 @@
 #ddev-generated
-RUN npm install --global pnpm && pnpm config set store-dir /mnt/ddev-global-cache/pnpm-store
+RUN npm install --global pnpm
