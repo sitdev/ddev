@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # $NODE_VER
 {
-  export NVM_DIR="$HOME/.nvm"
-  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-  useNodeVer="${NODE_VER}" || 20
-  nodeVersions=$(nvm ls --no-alias --no-colors)
-  if [ -z "$(echo $nodeVersions | grep v${useNodeVer})" ]; then
-    nvm install ${useNodeVer} || true
-  fi
-  nvm use $useNodeVer
-  nvm alias default $useNodeVer
+#  export NVM_DIR="$HOME/.nvm"
+#  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+#  useNodeVer="${NODE_VER}" || 20
+#  nodeVersions=$(nvm ls --no-alias --no-colors)
+#  if [ -z "$(echo $nodeVersions | grep v${useNodeVer})" ]; then
+#    nvm install ${useNodeVer} || true
+#  fi
+#  nvm use $useNodeVer
+#  nvm alias default $useNodeVer
 #  yarn config set cache-folder /mnt/ddev-global-cache/yarn || yarn config set cacheFolder /mnt/ddev-global-cache/yarn || true
 #  npm config set cache /mnt/ddev-global-cache/npm || true
   yarn global add replace
