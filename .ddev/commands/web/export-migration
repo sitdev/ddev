@@ -3,7 +3,7 @@
 ## Description: Export the current WP Sync DB migration profile. 
 ## Example: "ddev export-migration"\nNote: There should be only one migration set up in the CMS, and the index should be "1". This migration will be given a name and an be executed later via the command "ddev run-migration [name]"
 
-mkdir -p .conf/migrations
-read -p "Migration name: [pull-staging] " MIGRATION_NAME
-MIGRATION_NAME=${MIGRATION_NAME:-pull-staging}
-wp option get wpsdb_settings --format=yaml --url=${DDEV_PRIMARY_URL} > ".conf/migrations/${MIGRATION_NAME}.yaml"
+#mkdir -p .conf/migrations
+#read -p "Migration name: [pull-staging] " MIGRATION_NAME
+#MIGRATION_NAME=${MIGRATION_NAME:-pull-staging}
+#wp option get wpsdb_settings --format=yaml --url=${DDEV_PRIMARY_URL} > ".conf/migrations/${MIGRATION_NAME}.yaml"

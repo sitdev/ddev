@@ -11,13 +11,13 @@
 # SITE_TITLE
 # NODE_VER
 
-export scriptRoot=$(cd "${BASH_SOURCE%/*}" && pwd)
-source $scriptRoot/.utilities
-
-if [[ -z $SOFT_RESET ]] || [[ ! -z $DOING_UPDATE ]]; then
-  for buildDir in $buildDirs; do
-    cd ${buildDir}
-    installYarn
-  done
-fi
-cd "${currentDirectory}"
+#export scriptRoot=$(cd "${BASH_SOURCE%/*}" && pwd)
+#source $scriptRoot/.utilities
+#
+#if [[ -z $SOFT_RESET ]] || [[ ! -z $DOING_UPDATE ]]; then
+#  for buildDir in $buildDirs; do
+#    cd ${buildDir}
+#    installYarn
+#  done
+#fi
+#cd "${currentDirectory}"

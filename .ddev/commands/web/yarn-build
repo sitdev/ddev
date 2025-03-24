@@ -16,22 +16,17 @@ export isProduction=$([[ ${1} == "production" ]] && echo '1')
 export scriptRoot=$(cd "${BASH_SOURCE%/*}" && pwd)
 source $scriptRoot/.utilities
 
-if [ ! -z "${SOFT_RESET}" ]; then
-  find . -type d \( -path "**/node_modules/*situation*" \
-  -o -path "**/node_modules/situation*" \
-  -o -path "**/bower_components/set-design*" \
-  -o -path "**/bower_components/vc-library*" \
-  -o -path "**/bower_components/orchestrator*" \) \
-  -prune | xargs -P 4 -I {} rm -rf {}
+if [ -n "${SOFT_RESET}" ]; then
+  find . -type d -name "node_modules" -prune -exec rm -rf {} \;
 fi
 
-for buildDir in $buildDirs; do
-  cd ${buildDir}
-  buildYarn
-done
-
-cd "${currentDirectory}"
-
-if [ ! -z "${SOFT_RESET}" ]; then
-  rm -f .ddev/.updated
-fi
+#for buildDir in $buildDirs; do
+#  cd ${buildDir}
+#  buildYarn
+#done
+#
+#cd "${currentDirectory}"
+#
+#if [ ! -z "${SOFT_RESET}" ]; then
+#  rm -f .ddev/.updated
+#fi

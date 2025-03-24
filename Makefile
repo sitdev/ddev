@@ -1,7 +1,7 @@
 # Situation DDEV
-# Version: 0.0.1
+# Version: 0.1.0
 
-UPDATE_BRANCH="arm"
+UPDATE_BRANCH="sitchco"
 .PHONY: *
 
 all: develop

@@ -1,0 +1,10 @@
+services:
+  web:
+    volumes:
+      - yarn-cache:/home/node/.cache/yarn
+      - npm-cache:/home/node/.npm
+      - pnpm-store:/home/node/.pnpm-store
+volumes:
+  yarn-cache:
+  npm-cache:
+  pnpm-store:

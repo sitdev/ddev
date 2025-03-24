@@ -11,13 +11,13 @@
 # SITE_TITLE
 # NODE_VER
 
-export scriptRoot=$(cd "${BASH_SOURCE%/*}" && pwd)
-source $scriptRoot/.utilities
-
-for buildDir in $buildDirs; do
-  cd ${buildDir}
-  if [ -f package.json ]; then
-    yarn upgrade
-  fi
-done
-cd "${currentDirectory}"
+#export scriptRoot=$(cd "${BASH_SOURCE%/*}" && pwd)
+#source $scriptRoot/.utilities
+#
+#for buildDir in $buildDirs; do
+#  cd ${buildDir}
+#  if [ -f package.json ]; then
+#    yarn upgrade
+#  fi
+#done
+#cd "${currentDirectory}"
