@@ -1,0 +1,1 @@
+export PATH=$PATH:/mnt/ddev-global-cache/pnpm-store
