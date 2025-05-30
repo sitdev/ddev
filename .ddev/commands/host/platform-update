@@ -7,6 +7,14 @@ if grep -q '"kint-php/kint": "^2.0"' composer.json; then
     ddev composer config extra.kint --unset
     ddev composer require --dev kint-php/kint:"*" --no-install
 fi
+if grep -q 'tabrisrp' composer.json; then
+  ddev mutagen sync
+  ddev ssh -- <<EOF
+  jq 'del(.repositories[] | select(.url | test("tabrisrp")))' ./composer.json > ./composer.tmp && mv ./composer.tmp ./composer.json
+EOF
+  ddev mutagen sync
+fi
+
 if grep -q 'situation/advanced-custom-fields-pro' composer.json; then
   ddev mutagen sync
   ddev ssh -- <<EOF
