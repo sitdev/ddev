@@ -1,111 +1,21 @@
 #!/bin/bash
 set -euo pipefail
 
-# Initialize directories
+#!/bin/bash
+
 current_directory=$(pwd)
 themes_directory="${current_directory}/wp-content/themes"
-child_themes=$(ls -d "${themes_directory}"/*/ | grep -v orchestrator)
 
-# Check if a theme directory has the valid identifier in its style.css
-is_valid_theme() {
-    local theme_dir="$1"
-    if [[ -f "${theme_dir}/style.css" ]] && grep -q "orchestrator" "${theme_dir}/style.css"; then
-        return 0
+# Find valid child themes
+valid_child_themes=()
+for dir in "${themes_directory}"/*/; do
+    if [[ -f "${dir}/style.css" ]] && grep -q "orchestrator" "${dir}/style.css"; then
+        valid_child_themes+=("$dir")
     fi
-    return 1
-}
+done
 
-# Check if a directory contains an eslint-config in its package.json
-check_for_eslint_config() {
-    local dir="$1"
-    if [[ -f "${dir}/package.json" ]] && grep -q "eslint-config" "${dir}/package.json"; then
-        echo "Found upgrade candidate in: ${dir}"
-        return 0
-    fi
-    return 1
-}
 
-# Check for upgrade candidate in the global directory or any valid theme directory
-check_upgrade_candidate() {
-    if check_for_eslint_config "${current_directory}"; then
-        return 0
-    fi
-    for theme_dir in ${child_themes}; do
-        if is_valid_theme "${theme_dir}" && check_for_eslint_config "${theme_dir}"; then
-            return 0
-        fi
-    done
-    return 1
-}
-
-# Update global configuration files
-update_config_files() {
-    grep -v 'NODE_VER' .conf/.env > temp_file && \
-        echo 'NODE_VER="20"' >> temp_file && \
-        mv temp_file .conf/.env || {
-            echo "Error updating .conf/.env" >&2
-            return 1
-    }
-    sed -i '' 's/^UPDATE_BRANCH="main"$/UPDATE_BRANCH="arm"/' Makefile || {
-        echo "Error updating Makefile" >&2
-        return 1
-    }
-    sed -i '' "s/github-runner/php8/g" ./.github/workflows/main.yml
-    ddev composer config platform --unset
-    echo "Updated configuration files"
-}
-
-cleanup_artifacts() {
-    local dir="$1"
-    (cd "${dir}" && rm -f package.json yarn.lock webpack.config.js .jscsrc .jshintrc)
-}
-# Replace the package.json with the template and update the project name
-replace_package_json() {
-    local template_path="./wp-content/vendor/situation/scripts/node20/build-tools/template/*"
-    
-    local project_name
-    project_name=$(git config --get remote.origin.url | sed 's/\.git$//' | xargs basename)
-    
-    cp -r $template_path ./ || return 1
-    sed -i '' "s/{{project-name}}/$project_name/g" ./package.json
-    echo "Updated package.json with project name: $project_name"
-}
-
-# Process each valid theme directory in a single pass
-process_theme_dirs() {
-    for theme_dir in ${child_themes}; do
-        if is_valid_theme "${theme_dir}"; then
-            echo "Processing theme: ${theme_dir}"
-            cleanup_artifacts "${theme_dir}"
-            cp ./package.json "${theme_dir}/"
-            cp ./webpack.config.js "${theme_dir}/"
-            echo "20" > "${theme_dir}/.nvmrc"
-            # Update main.js imports if it exists
-            local main_js="${theme_dir}/assets/scripts/main.js"
-            if [[ -f "$main_js" ]]; then
-                grep -v "../images\|../fonts" "$main_js" > "${main_js}.tmp" && \
-                    mv "${main_js}.tmp" "$main_js" || {
-                        echo "Error updating ${main_js}" >&2
-                        return 1
-                    }
-                echo "Updated main.js in ${theme_dir}"
-            fi
-            
-            # Create assets.js file
-            local assets_js="${theme_dir}/assets/scripts/assets.js"
-            mkdir -p "$(dirname "$assets_js")"
-            cat <<-EOF > "$assets_js"
-				import { importAll } from '@situation/setdesign.util';
-				
-				importAll(require.context('../images', true));
-				importAll(require.context('../fonts', true));
-EOF
-            echo "Created assets.js in ${theme_dir}"
-        fi
-    done
-}
-
-# Preparation steps for the upgrade (global operations)
+# Preparation steps for the upgrade
 prepare_for_upgrade() {
     echo "Preparing project for upgrade..."
     make start
@@ -113,6 +23,59 @@ prepare_for_upgrade() {
     ddev composer update -o
 }
 
+
+# Update global configuration files
+update_config_files() {
+    grep -v 'NODE_VER' .conf/.env > temp_file && \
+        echo 'NODE_VER="20"' >> temp_file && \
+        mv temp_file .conf/.env || {
+        echo "Error updating .conf/.env" >&2
+        return 1
+    }
+    sed -i '' 's/^UPDATE_BRANCH="php7"$/UPDATE_BRANCH="arm"/' Makefile
+    sed -i '' 's/^UPDATE_BRANCH="main"$/UPDATE_BRANCH="arm"/' Makefile
+    sed -i '' "s/github-runner/php8/g" ./.github/workflows/main.yml
+    ddev composer config platform --unset
+    echo "Updated configuration files"
+}
+
+clean() {
+    local dir="$1"
+    (cd "${dir}" && rm -f package.json yarn.lock webpack.config.js gulpfile.js bower.json .jscsrc .jshintrc .bowerrc assets/manifest.json assets/styles/bower.json)
+}
+
+update_theme() {
+    local theme_dir="$1"
+    local project_name
+    cp ./template/package.json "${theme_dir}/"
+    cp ./template/webpack.config.js "${theme_dir}/"
+    echo "20" > "${theme_dir}/.nvmrc"
+    
+    project_name=$(git config --get remote.origin.url | sed 's/\.git$//' | xargs basename)
+    
+    sed -i '' "s/orchestrator-child/$project_name/g" "${theme_dir}/package.json"
+    
+    # Update main.js imports if it exists
+    local main_js="${theme_dir}/assets/scripts/main.js"
+    if [[ -f "$main_js" ]]; then
+        grep -v "../images\|../fonts" "$main_js" > "${main_js}.tmp" && \
+            mv "${main_js}.tmp" "$main_js" || {
+            echo "Error updating ${main_js}" >&2
+            return 1
+        }
+        echo "Updated main.js in ${theme_dir}"
+    else
+        cp ./template/assets/scripts/main.js "${main_js}"
+    fi
+    cp ./template/assets/scripts/assets.js "${theme_dir}/assets/scripts/"
+    local main_scss="${theme_dir}/assets/styles/main.scss"
+    if [[ -f "$main_scss" ]] && grep -q "bower" "$main_scss"; then
+        cp ./template/assets/styles/main.scss "$main_scss"
+        echo "Replaced main.scss in ${theme_dir} due to bower reference"
+    fi
+    sed -i '' "s/_functions/functions/g" "${main_scss}"
+}
+# Finalize the upgrade
 finalize_upgrade() {
     make stop
     make clean
@@ -125,22 +88,21 @@ finalize_upgrade() {
     git add -A .
 }
 
-main() {
-    if ! check_upgrade_candidate; then
-        echo "Error: No upgrade candidate found in project" >&2
-        return 1
-    fi
-    
-    prepare_for_upgrade  # Warm up ddev and perform preliminary tasks
-    ddev mutagen sync
-    update_config_files
-    replace_package_json
-    process_theme_dirs
-    cleanup_artifacts "${current_directory}"
-    ddev mutagen sync
-    finalize_upgrade
-    echo "Node.js 20 upgrade complete"
-    return 0
-}
+prepare_for_upgrade
+ddev mutagen sync
 
-main
+update_config_files
+
+for dir in "${current_directory}" "${valid_child_themes[@]}"; do
+    clean "${dir}"
+done
+
+git clone git@github.com:situationinteractive/orchestrator-child-theme.git template
+
+for dir in "${valid_child_themes[@]}"; do
+    update_theme "${dir}"
+done
+
+rm -rf ./template
+
+finalize_upgrade
