@@ -75,6 +75,7 @@ update_theme() {
     fi
     sed -i '' "s/_functions/functions/g" "${main_scss}"
     ddev replace "../images" "./images" "${theme_dir}/assets/styles/" -r
+    ddev replace "../fonts" "./fonts" "${theme_dir}/assets/styles/" -r
 }
 # Finalize the upgrade
 finalize_upgrade() {
