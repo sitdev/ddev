@@ -67,7 +67,7 @@ update_theme() {
     else
         cp ./template/assets/scripts/main.js "${main_js}"
     fi
-    cp ./template/assets/scripts/assets.js "${theme_dir}/assets/scripts/"
+    ddev replace "'@situation/orchestrator'" "'@situation/orchestrator/assets/scripts/theme'" "${theme_dir}/assets/scripts/main.js"
     local main_scss="${theme_dir}/assets/styles/main.scss"
     if [[ -f "$main_scss" ]] && grep -q "bower" "$main_scss"; then
         cp ./template/assets/styles/main.scss "$main_scss"
