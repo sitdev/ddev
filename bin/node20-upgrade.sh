@@ -46,6 +46,7 @@ clean() {
 
 update_theme() {
     local theme_dir="$1"
+    local theme_dir_rel="${theme_dir#"$current_directory"/}"
     local project_name
     cp ./template/package.json "${theme_dir}/"
     cp ./template/webpack.config.js "${theme_dir}/"
@@ -57,23 +58,27 @@ update_theme() {
     
     # Update main.js imports if it exists
     local main_js="${theme_dir}/assets/scripts/main.js"
+    rm -f "${theme_dir}/assets/scripts/assets.js"
     if [[ -f "$main_js" ]]; then
         grep -v "../images\|../fonts" "$main_js" > "${main_js}.tmp" && \
             mv "${main_js}.tmp" "$main_js" || {
             echo "Error updating ${main_js}" >&2
             return 1
         }
+        ddev mutagen sync
+        ddev replace "'@situation/orchestrator'" "'@situation/orchestrator/assets/scripts/theme'" "${theme_dir_rel}assets/scripts/main.js"
         echo "Updated main.js in ${theme_dir}"
     else
         cp ./template/assets/scripts/main.js "${main_js}"
     fi
-    cp ./template/assets/scripts/assets.js "${theme_dir}/assets/scripts/"
     local main_scss="${theme_dir}/assets/styles/main.scss"
     if [[ -f "$main_scss" ]] && grep -q "bower" "$main_scss"; then
         cp ./template/assets/styles/main.scss "$main_scss"
         echo "Replaced main.scss in ${theme_dir} due to bower reference"
     fi
     sed -i '' "s/_functions/functions/g" "${main_scss}"
+    ddev replace "\.\./images" "./images" "${theme_dir_rel}assets/styles/" -r
+    ddev replace "\.\./fonts" "./fonts" "${theme_dir_rel}assets/styles/" -r
 }
 # Finalize the upgrade
 finalize_upgrade() {
