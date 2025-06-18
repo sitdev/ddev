@@ -17,7 +17,7 @@ for target in "${buildTargets[@]}"; do
     (
     cd "$target"
     echo "=== ${targetName} ==="
-    rm -rf node_modules
+    find . -type d -name node_modules -prune -exec rm -rf {} \;
     pnpm up --latest
     echo ""
     )

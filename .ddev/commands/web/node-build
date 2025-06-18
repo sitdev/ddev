@@ -18,7 +18,7 @@ for target in "${buildTargets[@]}"; do
     cd "$target"
     echo "=== ${targetName} ==="
     if [ -n "$PLUGIN_DEV_MODE" ]; then
-        rm -rf node_modules
+        find . -type d -name node_modules -prune -exec rm -rf {} \;
         pnpm install >/dev/null 2>&1
     fi
     pnpm run build
