@@ -56,6 +56,12 @@ container-sync:
 watch: ## Start the watch task
 	@ddev yarn-watch
 	
+lint: ## Lint source files
+	@ddev yarn-lint
+
+format: ## Format source files
+	@ddev yarn-lint
+
 logging: ## Tail the ddev log
 	@ddev log-tail
 
