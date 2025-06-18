@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+
+## Description: Upgrade package.json
+
+# currentDirectory
+# buildTargets
+# PLUGIN_DEV_MODE
+# SITE_NAME
+# SITE_TITLE
+# NODE_VER
+
+export scriptRoot=$(dirname "$(realpath "${BASH_SOURCE[0]}")")
+source "$scriptRoot/.utilities"
+
+for target in "${buildTargets[@]}"; do
+    targetName=$(basename $target)
+    (
+    cd "$target"
+    echo "=== ${targetName} ==="
+    rm -rf node_modules
+    pnpm up --latest
+    echo ""
+    )
+done

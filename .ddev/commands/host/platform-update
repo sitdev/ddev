@@ -24,4 +24,5 @@ EOF
   ddev mutagen sync
 fi
 ddev composer update -o --no-install
+ddev node-upgrade
 ddev mutagen sync

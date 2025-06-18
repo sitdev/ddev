@@ -9,53 +9,18 @@ export NVM_DIR="$HOME/.nvm"
 nvm use $NODE_VER >/dev/null 2>&1
 
 export currentDirectory=$(pwd)
-export themesDirectory=${currentDirectory}/wp-content/themes
-export pluginsDirectory=${currentDirectory}/wp-content/plugins
-export childThemes=$(ls -d ${themesDirectory}/*/ | grep -v orchestrator)
-if [[ -f .ddev/.updated || -f .ddev/.plugin-dev-mode ]]; then
-  export SOFT_RESET=1
+if [ -f .ddev/.plugin-dev-mode ]; then
+    export PLUGIN_DEV_MODE=1
 fi
-if [ -f .ddev/.updated ]; then
-  export DOING_UPDATE=1
-fi
+buildTargets=()
+while IFS= read -r dir; do
+    if [ -f "$dir/package.json" ]; then
+        if [ -n "$PLUGIN_DEV_MODE" ]; then ## if we are in plugin dev mode, include all
+            buildTargets+=("$dir")
+        elif [ -f "$dir/style.css" ] && grep -q 'sitchco-parent-theme' "$dir/style.css"; then ## If not plugin dev mode, only include targets where the style.css contains the string 'sitchco-parent-theme'
+            buildTargets+=("$dir")
+        fi
+    fi
+done < <(find . -type f -name "sitchco.config.php" -exec dirname {} \; | sort)
 
-getPotentialBuildDirs() {
-  [[ -f webpack.config.js || -f bower.json ]] && echo ${currentDirectory}
-  for theme in $childThemes; do
-    [[ -f ${theme}/webpack.config.js || -f ${theme}/bower.json ]] && echo ${theme}
-  done
-}
-export buildDirs=$(getPotentialBuildDirs)
-
-installYarn() {
-  if [ -f package.json ]; then
-    [ -z $SOFT_RESET ] && yarn || yarn install --check-files 
-    if [ -f bower.json ]; then
-      command -v bower >/dev/null 2>&1 || yarn global add bower
-      bower install
-    fi
-  fi
-}
-
-buildYarn() {
-  [ ! -z $SOFT_RESET ] && installYarn
-  if [ -f package.json ]; then
-    if [ -f webpack.config.js ]; then
-      [ -z "${isProduction}" ] && yarn develop || yarn production
-    fi
-    if [ -f gulpfile.js ]; then
-      [ -z "${isProduction}" ] && yarn gulp || yarn gulp --production
-    fi
-  fi
-}
-
-watchYarn() {
-  if [ -f package.json ]; then
-    if [ -f webpack.config.js ]; then
-      yarn watch
-    fi
-    if [ -f gulpfile.js ]; then
-      yarn gulp watch
-    fi
-  fi
-}
+export buildTargets

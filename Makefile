@@ -13,17 +13,17 @@ production: start install-production build-production container-sync ## Create t
 
 install: ## Install all dev dependencies
 	@ddev composer-install
-	@ddev yarn-install
+	@ddev node-install
 
 install-production:
 	@ddev composer install -o --no-dev
-	@ddev yarn-install
+	@ddev node-install
 
 build: ## Run front-end dev build
-	@ddev yarn-build
+	@ddev node-build
 
 build-production:
-	@ddev yarn-build production
+	@ddev node-build production
 
 start: ## Turn on ddev
 	@if ! docker info >/dev/null 2>&1; then \
@@ -54,8 +54,14 @@ container-sync:
 	@make running 2>/dev/null && ddev mutagen sync || ddev mutagen reset
 
 watch: ## Start the watch task
-	@ddev yarn-watch
+	@ddev node-watch
 	
+lint: ## Lint source files
+	@ddev node-lint
+
+format: ## Format source files
+	@ddev node-format
+
 logging: ## Tail the ddev log
 	@ddev log-tail
 

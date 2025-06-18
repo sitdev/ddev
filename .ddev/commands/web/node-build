@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+## Description: Run the yarn/webpack/gulp build.
+
+# currentDirectory
+# buildTargets
+# PLUGIN_DEV_MODE
+# SITE_NAME
+# SITE_TITLE
+# NODE_VER
+
+export scriptRoot=$(dirname "$(realpath "${BASH_SOURCE[0]}")")
+source "$scriptRoot/.utilities"
+
+for target in "${buildTargets[@]}"; do
+    targetName=$(basename $target)
+    (
+    cd "$target"
+    echo "=== ${targetName} ==="
+    if [ -n "$PLUGIN_DEV_MODE" ]; then
+        rm -rf node_modules
+        pnpm install >/dev/null 2>&1
+    fi
+    pnpm run build
+    echo ""
+    )
+done

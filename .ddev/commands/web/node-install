@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+## Description: Install all front-end dependencies.
+
+# currentDirectory
+# buildTargets
+# PLUGIN_DEV_MODE
+# SITE_NAME
+# SITE_TITLE
+# NODE_VER
+
+export scriptRoot=$(dirname "$(realpath "${BASH_SOURCE[0]}")")
+source "$scriptRoot/.utilities"
+if [ -n "$PLUGIN_DEV_MODE" ]; then
+    exit
+fi
+
+for target in "${buildTargets[@]}"; do
+    targetName=$(basename $target)
+    (
+    cd "$target"
+    echo "=== ${targetName} ==="
+    rm -rf node_modules
+    pnpm install
+    echo ""
+    )
+done
