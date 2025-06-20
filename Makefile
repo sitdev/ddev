@@ -76,6 +76,7 @@ reset: ## Clean build and git hard reset/pull
 update: clean start ## Composer update
 	@ddev platform-update
 	@make
+	@ddev node-upgrade
 
 update-review: ## Full reset and update process with manual comparison against a remote install for code changes and visual regression.
 	@ddev update-review
