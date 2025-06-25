@@ -13,12 +13,17 @@ export scriptRoot=$(dirname "$(realpath "${BASH_SOURCE[0]}")")
 source "$scriptRoot/.utilities"
 
 for target in "${buildTargets[@]}"; do
-    targetName=$(basename $target)
     (
-    cd "$target"
-    echo "=== ${targetName} ==="
-    find . -type d -name node_modules -prune -exec rm -rf {} \;
-    pnpm up --latest
-    echo ""
+        cd "$target" || continue
+
+        targetName=$(basename "$target")
+        sitchco_dev_deps=$(jq -r '.devDependencies // {} | keys[] | select(contains("sitchco"))' package.json)
+        if [ -n "$sitchco_dev_deps" ]; then
+            echo "=== Updating: ${targetName} ==="
+            find . -type d -name node_modules -prune -exec rm -rf {} \;
+            pnpm up ${sitchco_dev_deps} --latest
+            pnpm install
+        fi
+        echo ""
     )
 done
