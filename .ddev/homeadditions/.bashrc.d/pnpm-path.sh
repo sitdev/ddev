@@ -1,1 +1,1 @@
-export PATH=$PATH:/mnt/ddev-global-cache/pnpm-store
+export PATH=$PATH:/mnt/ddev-global-cache/${DDEV_SITENAME}/pnpm-store

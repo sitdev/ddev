@@ -4,3 +4,4 @@ services:
       - YARN_CACHE_FOLDER=/mnt/ddev-global-cache/${DDEV_SITENAME}/yarn
       - npm_config_cache=/mnt/ddev-global-cache/${DDEV_SITENAME}/npm
       - PNPM_HOME=/mnt/ddev-global-cache/${DDEV_SITENAME}/pnpm-store
+      - npm_config_store_dir=/mnt/ddev-global-cache/${DDEV_SITENAME}/pnpm-store
