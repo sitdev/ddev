@@ -88,6 +88,7 @@ finalize_upgrade() {
     make start
     ddev import-db --file=./db-backup.sql.gz
     rm -f ./db-backup.sql.gz
+    ddev yarn cache clean --all
     make
     ddev mutagen sync
     git add -A .
