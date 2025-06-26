@@ -23,5 +23,12 @@ if grep -q 'situation/advanced-custom-fields-pro' composer.json; then
 EOF
   ddev mutagen sync
 fi
+
+if [ -f .github/workflows/main.yml ]; then
+    if grep -q 'runner-cache' .github/workflows/main.yml; then
+        sed -i '' '/runner-cache/d' .github/workflows/main.yml
+    fi
+fi
+
 ddev composer update -o --no-install
 ddev mutagen sync
