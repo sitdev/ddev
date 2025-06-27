@@ -20,7 +20,7 @@ prepare_for_upgrade() {
     echo "Preparing project for upgrade..."
     make start
     ddev export-db --file=./db-backup.sql.gz
-    ddev composer update -o
+    make update
 }
 
 
