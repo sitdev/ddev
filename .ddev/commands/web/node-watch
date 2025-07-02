@@ -46,7 +46,7 @@ for target in "${buildTargets[@]}"; do
 
     # Give Vite a moment to initialize and claim a port.
     # You can adjust this duration if your projects take longer to start.
-    sleep 2
+    sleep 0.5
 done
 
 wait
