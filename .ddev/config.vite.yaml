@@ -1,5 +1,37 @@
+# Expose a range of ports for multiple Vite instances.
+#
+# To satisfy the requirement that both http_port and https_port must exist,
+# we map two unique port ranges on the host to the single sequential range
+# that Vite will use inside the container.
+#
+# - HTTPS will use ports 5173-5178. (e.g., https://<project>.ddev.site:5173)
+# - HTTP will use ports 6173-6178.  (e.g., http://<project>.ddev.site:6173)
+#
+# Vite will still find and use ports 5173, 5174, etc., sequentially inside
+# the container, so the development workflow remains the same.
+
 web_extra_exposed_ports:
-  - name: vite
+  - name: vite-1
     container_port: 5173
-    http_port: 5172
     https_port: 5173
+    http_port: 6173
+  - name: vite-2
+    container_port: 5174
+    https_port: 5174
+    http_port: 6174
+  - name: vite-3
+    container_port: 5175
+    https_port: 5175
+    http_port: 6175
+  - name: vite-4
+    container_port: 5176
+    https_port: 5176
+    http_port: 6176
+  - name: vite-5
+    container_port: 5177
+    https_port: 5177
+    http_port: 6177
+  - name: vite-6
+    container_port: 5178
+    https_port: 5178
+    http_port: 6178

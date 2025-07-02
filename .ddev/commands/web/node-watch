@@ -1,49 +1,49 @@
 #!/usr/bin/env bash
 
-## Description: Build all other targets, then run VITE HMR dev in one of them.
+## Description: Run Vite HMR dev servers for all targets sequentially
+## to avoid port conflicts, then let them run concurrently.
 
-# currentDirectory
-# buildTargets
-# PLUGIN_DEV_MODE
-# SITE_NAME
-# SITE_TITLE
-# NODE_VER
+# Assuming these variables are set in your environment or the sourced file:
+# buildTargets: An array of paths to your Vite projects.
+# E.g., buildTargets=("./packages/app-one" "./packages/app-two")
 
 export scriptRoot=$(dirname "$(realpath "${BASH_SOURCE[0]}")")
-source "$scriptRoot/.utilities"
-
-# If there's only one target, select it automatically
-if [ "${#buildTargets[@]}" -eq 1 ]; then
-  selectedTarget="${buildTargets[0]}"
-
-# Otherwise, prompt the user to choose one
-else
-  echo "Multiple build targets found. Please select the desired target for the HMR watch task:"
-  PS3="Enter your choice [1-${#buildTargets[@]}]: "
-  select selectedTarget in "${buildTargets[@]}"; do
-    if [ -n "$selectedTarget" ]; then
-      break
-    else
-      echo "Invalid selection. Try again."
-    fi
-  done
+if [ -f "$scriptRoot/.utilities" ]; then
+    source "$scriptRoot/.utilities"
 fi
 
-# Build all the non-selected targets
+# Function to gracefully shut down all background processes on exit
+cleanup() {
+    echo -e "\n\nShutting down all dev servers..."
+    # The 'pkill' command with -P $$ targets child processes of the current script
+    pkill -P $$
+    echo "Done."
+}
+
+# Trap the EXIT signal (e.g., from Ctrl+C) to run the cleanup function
+trap cleanup EXIT
+
+echo "Preparing dev server..."
 for target in "${buildTargets[@]}"; do
-  if [ "$target" != "$selectedTarget" ]; then
     targetName=$(basename "$target")
     (
-      cd "$target"
-      echo "=== Building ${targetName} ==="
-      pnpm run build
-      echo ""
-    )
-  fi
+        cd "$target"
+        pnpm install
+    ) >/dev/null 2>&1
+done
+for target in "${buildTargets[@]}"; do
+    targetName=$(basename "$target")
+    echo "--- Starting dev server for: ${targetName} ---"
+    (
+        cd "$target"
+        # The output of each server will be prefixed with its name
+        pnpm run dev | sed "s/^/[${targetName}] /"
+    ) &
+
+    # Give Vite a moment to initialize and claim a port.
+    # You can adjust this duration if your projects take longer to start.
+    sleep 2
+    echo ""
 done
 
-# Finally, run dev in the selected target
-(
-  cd "$selectedTarget"
-  pnpm run dev
-)
+wait
