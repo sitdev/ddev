@@ -15,14 +15,18 @@ fi
 # Function to gracefully shut down all background processes on exit
 cleanup() {
     echo -e "\n\nShutting down all dev servers..."
-    # The 'pkill' command with -P $$ targets child processes of the current script
+    # 'pkill -P $$' sends a TERM signal to all direct child processes of this script.
     pkill -P $$
     echo "Done."
+    # We explicitly exit with status 0 to indicate a successful, clean shutdown.
+    # This prevents the parent process (node-watch) from reporting a failure.
+    exit 0
 }
 
-# Trap the EXIT signal (e.g., from Ctrl+C) to run the cleanup function
-trap cleanup EXIT
-
+# SIGINT is sent on Ctrl+C.
+# SIGTERM is a generic termination signal (e.g., from 'kill' commands).
+# This is more precise than trapping the general 'EXIT' signal for this use case.
+trap cleanup SIGINT SIGTERM
 echo "Preparing dev server..."
 for target in "${buildTargets[@]}"; do
     targetName=$(basename "$target")
@@ -43,7 +47,6 @@ for target in "${buildTargets[@]}"; do
     # Give Vite a moment to initialize and claim a port.
     # You can adjust this duration if your projects take longer to start.
     sleep 2
-    echo ""
 done
 
 wait
