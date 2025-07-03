@@ -2,43 +2,46 @@
 
 ## Getting Started: Local Environment
 
-Clone the repository, and run:
+This project uses DDEV and Make to standardize the local development environment.
 
-```shell
-make
-```
+1. **Clone the repository.**
+2. **Ensure you have the required tools installed** (see Requirements section below).
+3. **Run the main development command:**
+   ```shell
+   make dev
+   ```
 
-This will:
+This single command will handle the entire "cold start" process:
 
-1. Spin up the docker container.
-2. Install all dependencies.
-3. Run the build process.
-4. Initialize local WP<span style="color:red">*</span>.
-5. Open a migration dialog to pull staging<span style="color:red">*</span>.
+1. Spin up the Docker container via DDEV.
+2. Install all Composer and Node.js dependencies.
+3. Start the Vite dev server with Hot Module Replacement (HMR).
 
-<sup><span style="color:red">*</span> first run only</sup>
+You are now ready to start developing.
 
 ## Requirements
 
-- [Docker](https://formulae.brew.sh/formula/docker)
-- [Colima](https://github.com/abiosoft/colima)
+- [OrbStack](https://orbstack.dev/)
 - [DDEV](https://ddev.readthedocs.io/en/stable/)
 
-See https://github.com/sitdev/ddev/ for more info.
+For more information on the base DDEV setup, see [https://github.com/sitdev/ddev/](https://github.com/sitdev/ddev/).
 
 ## Useful Commands
 
-| Command                | Description                                                                                                                                                            |
-|------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `make help `           | Shows info about most of the available make commands.                                                                                                                  |
-| `make`                 | Spins up the ddev container, runs the full build, and starts a migration dialog on first run.                                                                          |
-| `make start`           | Spins up the ddev container.                                                                                                                                           |
-| `make stop`            | Stops all running ddev containers.                                                                                                                                     |
-| `make install`         | Installs all of the dev dependencies for composer and yarn.                                                                                                            |
-| `make build`           | Runs the development build.                                                                                                                                            |
-| `make watch`           | Runs the watch task.                                                                                                                                                   |
-| `make update`          | Runs composer update and updates the ddev config.                                                                                                                      |
-| `make clean`           | Cleans the build and installed dependencies.                                                                                                                           |
-| `make local-init`      | Creates the local-config.php file and initializes the WP database with basic defaults using wp-cli.                                                                    |
-| `make xdebug`          | Toggles Xdebug status (off by default). Works out of the box with phpstorm, but you will need to clear any previous xdebug mappings under Preferences > PHP > Servers. |
+The Makefile provides several commands to streamline your workflow. Here are the most common ones:
 
+| Command           | Description                                                                                                         |
+|-------------------|---------------------------------------------------------------------------------------------------------------------|
+| `make help`       | Shows info about most of the available make commands.                                                               |
+| `make dev`        | **Primary dev command.** Starts a full session: turns on DDEV, installs dependencies, and runs the Vite dev server. |
+| `make`            | **Default command.** Runs a one-off build with dev dependencies and exits.                                          |
+| `make build`      | Runs a one-off front-end build.                                                                                     |
+| `make start`      | Spins up the DDEV container without running a build or server.                                                      |
+| `make stop`       | Stops all running DDEV containers.                                                                                  |
+| `make install`    | Installs all dev dependencies for Composer and Node.js.                                                             |
+| `make update`     | Runs composer update and updates the ddev config.                                                                   |
+| `make clean`      | Cleans the build and installed dependencies.                                                                        |
+| `make format`     | Automatically formats all source code to match project style guidelines.                                            |
+| `make lint`       | Analyzes source code for style issues and potential errors without making changes.                                  |
+| `make local-init` | Creates the local-config.php file and initializes the WP database with basic defaults on first run.                 |
+| `make xdebug`     | Toggles Xdebug status (off by default).                                                                             |

@@ -19,7 +19,7 @@ cleanup() {
     pkill -P $$
     echo "Done."
     # We explicitly exit with status 0 to indicate a successful, clean shutdown.
-    # This prevents the parent process (node-watch) from reporting a failure.
+    # This prevents the parent process (node-dev) from reporting a failure.
     exit 0
 }
 

@@ -4,12 +4,13 @@
 UPDATE_BRANCH="sitchco"
 .PHONY: *
 
-all: develop
+all: start install build container-sync
 	@ddev wp core is-installed >/dev/null 2>&1 || make local-init
 	@printf "\nEnter \033[36mmake help\033[0m for more info\n\n"
 
-develop: start install build container-sync ## Turn on ddev and run build (default)
-production: start install-production build-production container-sync ## Create the production build
+dev: start install container-sync dev-server 
+
+production: start install-production build container-sync ## Create the production build
 
 install: ## Install all dev dependencies
 	@ddev composer-install
@@ -21,9 +22,6 @@ install-production:
 
 build: ## Run front-end dev build
 	@ddev node-build
-
-build-production:
-	@ddev node-build production
 
 start: ## Turn on ddev
 	@if ! docker info >/dev/null 2>&1; then \
@@ -53,9 +51,11 @@ container-sync:
 	@echo "Syncing mutagen container..."
 	@make running 2>/dev/null && ddev mutagen sync || ddev mutagen reset
 
-watch: ## Start the watch task
-	@ddev node-watch
-	
+dev-server: ## Start the vite dev server
+	@ddev node-dev
+
+watch: dev-server # Backwards compatibility
+
 lint: ## Lint source files
 	@ddev node-lint
 
