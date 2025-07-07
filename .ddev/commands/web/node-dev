@@ -27,12 +27,13 @@ cleanup() {
 # SIGTERM is a generic termination signal (e.g., from 'kill' commands).
 # This is more precise than trapping the general 'EXIT' signal for this use case.
 trap cleanup SIGINT SIGTERM
-echo "Preparing dev server..."
 for target in "${buildTargets[@]}"; do
     targetName=$(basename "$target")
     (
         cd "$target"
-        pnpm install
+        if [ ! -d "node_modules" ]; then
+            pnpm install
+        fi
     ) >/dev/null 2>&1
 done
 for target in "${buildTargets[@]}"; do
