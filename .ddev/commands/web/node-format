@@ -16,8 +16,7 @@ for target in "${buildTargets[@]}"; do
     targetName=$(basename $target)
     (
     cd "$target"
-    echo "=== ${targetName} ==="
-    pnpm run format
-    echo ""
-    )
+    pnpm run format | sed "s/^/[${targetName}] /"
+    ) &
 done
+wait
