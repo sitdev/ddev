@@ -15,11 +15,8 @@ fi
 buildTargets=()
 while IFS= read -r dir; do
     if [ -f "$dir/package.json" ]; then
-        if [ -n "$PLUGIN_DEV_MODE" ]; then ## if we are in plugin dev mode, include all
-            buildTargets+=("$dir")
-        elif [ -f "$dir/style.css" ] && grep -q 'sitchco-parent-theme' "$dir/style.css"; then ## If not plugin dev mode, only include targets where the style.css contains the string 'sitchco-parent-theme'
-            buildTargets+=("$dir")
-        fi
+        ## Only add target if package.json exists. This assumes our dist bundles will remove package.json and include dist build
+        buildTargets+=("$dir")
     fi
 done < <(find . -type f -name "sitchco.config.php" -exec dirname {} \; | sort)
 
