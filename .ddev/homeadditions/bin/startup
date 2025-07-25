@@ -12,6 +12,6 @@
   nvm alias default $useNodeVer
   yarn global add replace
   ## Clear old cache location
-  rm -rf /mnt/ddev-global-cache/yarn /mnt/ddev-global-cache/npm /mnt/ddev-global-cache/$DDEV_SITENAME
+  rm -rf /mnt/ddev-global-cache/$DDEV_SITENAME
   grep -q "{{SITE_TITLE}}" README.md && replace "{{SITE_TITLE}}" "${SITE_TITLE}" ./README.md --silent || true
 } >/dev/null 2>&1
