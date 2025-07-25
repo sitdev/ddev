@@ -32,4 +32,5 @@ if [ -f .github/workflows/main.yml ]; then
 fi
 
 ddev composer update -o --no-install
+ddev yarn-reset
 ddev mutagen sync
