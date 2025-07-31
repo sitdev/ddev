@@ -1,28 +1,25 @@
 #!/bin/bash
 set -euo pipefail
 
-#!/bin/bash
-
 current_directory=$(pwd)
 themes_directory="${current_directory}/wp-content/themes"
 
 # Find valid child themes
 valid_child_themes=()
 for dir in "${themes_directory}"/*/; do
+    # Check if the directory contains a style.css with the orchestrator string
     if [[ -f "${dir}/style.css" ]] && grep -q "orchestrator" "${dir}/style.css"; then
         valid_child_themes+=("$dir")
     fi
 done
-
 
 # Preparation steps for the upgrade
 prepare_for_upgrade() {
     echo "Preparing project for upgrade..."
     make start
     ddev export-db --file=./db-backup.sql.gz
-    ddev composer update -o
+    make update
 }
-
 
 # Update global configuration files
 update_config_files() {
@@ -39,11 +36,13 @@ update_config_files() {
     echo "Updated configuration files"
 }
 
+# Clean specified directory
 clean() {
     local dir="$1"
     (cd "${dir}" && rm -f package.json yarn.lock webpack.config.js gulpfile.js bower.json .jscsrc .jshintrc .bowerrc assets/manifest.json assets/styles/bower.json)
 }
 
+# Update a single theme
 update_theme() {
     local theme_dir="$1"
     local theme_dir_rel="${theme_dir#"$current_directory"/}"
@@ -80,6 +79,7 @@ update_theme() {
     ddev replace "\.\./images" "./images" "${theme_dir_rel}assets/styles/" -r
     ddev replace "\.\./fonts" "./fonts" "${theme_dir_rel}assets/styles/" -r
 }
+
 # Finalize the upgrade
 finalize_upgrade() {
     make stop
@@ -89,26 +89,41 @@ finalize_upgrade() {
     ddev import-db --file=./db-backup.sql.gz
     rm -f ./db-backup.sql.gz
     ddev yarn cache clean --all
-    make
+    make update
     ddev mutagen sync
     git add -A .
 }
+
+# --- Main script execution ---
 
 prepare_for_upgrade
 ddev mutagen sync
 
 update_config_files
 
-for dir in "${current_directory}" "${valid_child_themes[@]}"; do
-    clean "${dir}"
-done
+# Always clean the main project directory
+clean "${current_directory}"
 
-git clone git@github.com:situationinteractive/orchestrator-child-theme.git template
+# Only perform child theme actions if valid themes exist
+if [[ ${#valid_child_themes[@]} -gt 0 ]]; then
+    echo "✅ Found ${#valid_child_themes[@]} valid child theme(s). Proceeding with updates..."
 
-for dir in "${valid_child_themes[@]}"; do
-    update_theme "${dir}"
-done
+    # Clean each valid child theme directory
+    for dir in "${valid_child_themes[@]}"; do
+        clean "${dir}"
+    done
 
-rm -rf ./template
+    # Clone the template, update themes, and then remove the template
+    git clone git@github.com:situationinteractive/orchestrator-child-theme.git template
+    for dir in "${valid_child_themes[@]}"; do
+        update_theme "${dir}"
+    done
+    rm -rf ./template
+
+else
+    echo "ℹ️ No valid child themes found. Skipping child theme-specific actions."
+fi
 
 finalize_upgrade
+
+echo "🎉 Upgrade process completed."

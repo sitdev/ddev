@@ -2,9 +2,6 @@
 
 ## Description: Tail the log, but only show php errors
 
-ddev logs -f --tail 10 |
-  grep --line-buffered "said into stderr:\|, referer" |
-  sed -u 's/^.*into stderr: "//g' |
-  sed -u 's/"$//g' |
-  sed -u 's/NOTICE: PHP message: //g' |
-  sed -u 's/^.*, referer/referer/g'
+ddev logs -f --tail 10 | \
+  grep --line-buffered "NOTICE: PHP message:" | \
+  sed -u 's/NOTICE: PHP message: //g'
