@@ -123,7 +123,7 @@ else
                     jq --indent 4 'if has("pnpm") and (.pnpm | has("overrides")) and (.pnpm.overrides | length == 0) then del(.pnpm.overrides) else . end' package.json > package.json.tmp && 
                     mv package.json.tmp package.json
                 fi
-                git restore pnpm-lock.yaml
+                git restore pnpm-lock.yaml >/dev/null 2>&1
                 pnpm install >/dev/null 2>&1
             )
         done
