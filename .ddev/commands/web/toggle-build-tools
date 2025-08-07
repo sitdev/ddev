@@ -57,16 +57,15 @@ find_packages() {
 
 if [ "$local_mode" = "on" ]; then
     echo "Installing @sitchco-packages…"
+    # Ensure wp-content/sitchco-packages is ignored by git
+    touch .gitignore
+    if ! grep -q "$sitchcoPackagesDir" .gitignore ; then
+      echo "$sitchcoPackagesDir/" >> .gitignore
+    fi
     if [ ! -d "$sitchcoPackagesDir" ]; then
         git clone git@github.com:sitchco/sitchco-packages.git "$sitchcoPackagesDir" >/dev/null 2>&1
     fi
     (cd "$sitchcoPackagesDir" && pnpm install) >/dev/null 2>&1
-
-    # Ensure wp-content/sitchco-packages is ignored by git
-    touch .gitignore
-    if ! grep -qxF "$sitchcoPackagesDir" .gitignore ; then
-      echo "$sitchcoPackagesDir/" >> .gitignore
-    fi
 
     # Convert newline-separated output of find_packages to a bash array
     IFS=$'\n' read -r -d '' -a sitchcoPackages <<< "$(find_packages "$sitchcoPackagesDir")"
