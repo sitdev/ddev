@@ -11,7 +11,6 @@
 
 export scriptRoot=$(dirname "$(realpath "${BASH_SOURCE[0]}")")
 source "$scriptRoot/.utilities"
-source "$scriptRoot/toggle-build-tools"
 if [ -n "$PLUGIN_DEV_MODE" ]; then
     exit
 fi

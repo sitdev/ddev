@@ -14,39 +14,19 @@
 export scriptRoot=$(dirname "$(realpath "${BASH_SOURCE[0]}")")
 source "$scriptRoot/.utilities"
 
-# Function to check if a command exists
 command_exists() {
   command -v "$1" >/dev/null 2>&1
 }
 
-# --- parse override flags, drop them from "$@" ---
 FLAG_OVERRIDE=""
+sitchcoPackagesDir="wp-content/sitchco-packages"
+
 while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --on)
-      FLAG_OVERRIDE="on"
-      shift
-      ;;
-    --off)
-      FLAG_OVERRIDE="off"
-      shift
-      ;;
-    *)
-      # any other arg we just skip
-      shift
-      ;;
-  esac
+  case "$1" in --on|--off) FLAG_OVERRIDE="${1#--}";; esac
+  shift
 done
 
-# Determine mode (use local variable)
-local_mode=""
-if [ "$FLAG_OVERRIDE" = "on" ]; then
-  local_mode="on"
-elif [ "$FLAG_OVERRIDE" = "off" ]; then
-  local_mode="off"
-elif [ -n "$PLUGIN_DEV_MODE" ]; then
-  local_mode="on"
-fi
+local_mode=${FLAG_OVERRIDE:-$( [ -d "$sitchcoPackagesDir" ] && echo off || echo on )}
 
 # Check for required commands
 for cmd in git pnpm jq; do
@@ -83,6 +63,12 @@ if [ "$local_mode" = "on" ]; then
         git clone git@github.com:sitchco/sitchco-packages.git "$sitchcoPackagesDir" >/dev/null 2>&1
     fi
     (cd "$sitchcoPackagesDir" && pnpm install) >/dev/null 2>&1
+
+    # Ensure wp-content/sitchco-packages is ignored by git
+    touch .gitignore
+    if ! grep -qxF "$sitchcoPackagesDir" .gitignore ; then
+      echo "$sitchcoPackagesDir/" >> .gitignore
+    fi
 
     # Convert newline-separated output of find_packages to a bash array
     IFS=$'\n' read -r -d '' -a sitchcoPackages <<< "$(find_packages "$sitchcoPackagesDir")"
