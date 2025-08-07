@@ -113,6 +113,7 @@ plugin-dev-mode: ## Toggles an alternate build process which clears and re-insta
 
 toggle-build-tools: ## Toggles the front-end build tooling packages
 	@ddev toggle-build-tools
+	@ddev mutagen sync
 
 status: ## Show project status and tools
 	@ddev status
