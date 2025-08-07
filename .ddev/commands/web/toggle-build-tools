@@ -36,8 +36,6 @@ for cmd in git pnpm jq; do
   fi
 done
 
-sitchcoPackagesDir="./wp-content/sitchco-packages"
-
 find_packages() {
   local base="${1:-.}"
 
