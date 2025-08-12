@@ -18,7 +18,7 @@ prepare_for_upgrade() {
     echo "Preparing project for upgrade..."
     make start
     ddev export-db --file=./db-backup.sql.gz
-    make update
+    ddev platform-update
 }
 
 # Update global configuration files
