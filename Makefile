@@ -112,7 +112,7 @@ test:
 plugin-dev-mode: ## Toggles an alternate build process which clears and re-installs all Situation node_modules content before each build.
 	@/bin/bash .ddev/commands/host/toggle-plugin-dev-mode
 
-toggle-build-tools: ## Toggles the front-end build tooling packages
+toggle-build-tools: start ## Toggles the front-end build tooling packages
 	@ddev toggle-build-tools
 	@make container-sync
 
