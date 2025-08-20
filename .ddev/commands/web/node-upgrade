@@ -12,6 +12,8 @@
 export scriptRoot=$(dirname "$(realpath "${BASH_SOURCE[0]}")")
 source "$scriptRoot/.utilities"
 
+"$scriptRoot/toggle-build-tools" --reinforce --skip-target-install
+
 for target in "${buildTargets[@]}"; do
     (
         cd "$target" || continue

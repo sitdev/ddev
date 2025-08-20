@@ -12,6 +12,8 @@ if [ -f "$scriptRoot/.utilities" ]; then
     source "$scriptRoot/.utilities"
 fi
 
+"$scriptRoot/toggle-build-tools" --reinforce --skip-target-install
+
 # Function to gracefully shut down all background processes on exit
 cleanup() {
     echo -e "\n\nShutting down all dev servers..."

@@ -14,10 +14,8 @@ source "$scriptRoot/.utilities"
 if [ -n "$PLUGIN_DEV_MODE" ]; then
     exit
 fi
-sitchcoPackagesDir="wp-content/sitchco-packages"
-if [ -d "$sitchcoPackagesDir" ]; then
-    (cd "$sitchcoPackagesDir" && pnpm install)
-fi
+
+"$scriptRoot/toggle-build-tools" --reinforce --skip-target-install
 
 for target in "${buildTargets[@]}"; do
     targetName=$(basename $target)

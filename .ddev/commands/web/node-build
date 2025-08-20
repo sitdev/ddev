@@ -11,8 +11,9 @@
 
 export scriptRoot=$(dirname "$(realpath "${BASH_SOURCE[0]}")")
 source "$scriptRoot/.utilities"
-sitchcoPackagesDir="wp-content/sitchco-packages"
-[ -n "$PLUGIN_DEV_MODE" ] && [ -d "$sitchcoPackagesDir" ] && (cd "$sitchcoPackagesDir" && pnpm install)
+if [ -n "$PLUGIN_DEV_MODE" ]; then
+    "$scriptRoot/toggle-build-tools" --reinforce --skip-target-install
+fi
 
 for target in "${buildTargets[@]}"; do
     targetName=$(basename $target)

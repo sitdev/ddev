@@ -19,6 +19,7 @@ command_exists() {
 }
 
 FLAG_OVERRIDE=""
+SKIP_TARGET_INSTALL=false
 sitchcoPackagesDir="wp-content/sitchco-packages"
 
 while [[ $# -gt 0 ]]; do
@@ -28,6 +29,9 @@ while [[ $# -gt 0 ]]; do
       ;;
     --reinforce)
       FLAG_OVERRIDE="reinforce"
+      ;;
+    --skip-target-install)
+      SKIP_TARGET_INSTALL=true
       ;;
   esac
   shift
@@ -70,7 +74,8 @@ if [ "$local_mode" = "on" ]; then
     echo "Installing @sitchco-packages…"
     # Ensure wp-content/sitchco-packages is ignored by git
     touch .gitignore
-    if ! grep -q "$sitchcoPackagesDir" .gitignore ; then
+    if ! grep -q "$sitchcoPackagesDir" .gitignore ;
+      then
       echo "$sitchcoPackagesDir/" >> .gitignore
     fi
     if [ ! -d "$sitchcoPackagesDir" ]; then
@@ -79,7 +84,7 @@ if [ "$local_mode" = "on" ]; then
     (cd "$sitchcoPackagesDir" && pnpm install) >/dev/null 2>&1
 
     # Convert newline-separated output of find_packages to a bash array
-    IFS=$'\n' read -r -d '' -a sitchcoPackages <<< "$(find_packages "$sitchcoPackagesDir")"
+    IFS=$'\n' read -r -d '' -a sitchcoPackages <<< "$(find_packages \"$sitchcoPackagesDir\")"
     if [ ${#sitchcoPackages[@]} -eq 0 ]; then
         echo "No packages found in $sitchcoPackagesDir. Exiting."
         exit
@@ -92,10 +97,11 @@ if [ "$local_mode" = "on" ]; then
 
             # extract all @sitchco dependency names (strip the prefix)
             mapfile -t wantedPackages < <(
-              jq -r '
-                ( .dependencies // {} + .devDependencies // {} )
-                | keys[]
-                | select(startswith("@sitchco/"))
+              jq -r \
+                '\
+                ( .dependencies // {} + .devDependencies // {} ) \
+                | keys[] \
+                | select(startswith("@sitchco/")) \
                 | sub("^@sitchco/";"")
               ' package.json
             )
@@ -114,13 +120,14 @@ if [ "$local_mode" = "on" ]; then
                         found=true
                         break
                     fi
-                done
-                if ! $found; then
+done
+                if ! $found;
+                  then
                     echo "⚠️  Warning: @sitchco/$pkgName not found in sitchco-packages."
                 fi
-            done
+done
         )
-    done
+done
 else
     if [ -d "$sitchcoPackagesDir" ]; then
         for target in "${buildTargets[@]}"; do
@@ -131,13 +138,15 @@ else
                 pnpm unlink >/dev/null 2>&1
                 if [ -f package.json ]; then
                     # Remove pnpm.overrides if it exists and is empty
-                    jq --indent 4 'if has("pnpm") and (.pnpm | has("overrides")) and (.pnpm.overrides | length == 0) then del(.pnpm.overrides) else . end' package.json > package.json.tmp && 
+                    jq --indent 4 'if has("pnpm") and (.pnpm | has("overrides")) and (.pnpm.overrides | length == 0) then del(.pnpm.overrides) else . end' package.json > package.json.tmp &&
                     mv package.json.tmp package.json
                 fi
                 git restore pnpm-lock.yaml >/dev/null 2>&1
-                pnpm install >/dev/null 2>&1
+                if ! $SKIP_TARGET_INSTALL; then
+                    pnpm install >/dev/null 2>&1
+                fi
             )
-        done
+done
         rm -rf "$sitchcoPackagesDir"
     fi
 fi
