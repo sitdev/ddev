@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 ## Description: Install all front-end dependencies, with optional overrides
 ## Usage:       toggle-build-tools [flags]
-## Flags:       [{"Name":"on","Usage":"force enable dev mode"},{"Name":"off","Usage":"force disable dev mode"}]
+## Flags:       [{"Name":"on","Usage":"force enable dev mode"},{"Name":"off","Usage":"force disable dev mode"},{"Name":"reinforce","Usage":"reinforce existing dev mode"}]
 ## ExecRaw:     true
 
 # currentDirectory
@@ -22,11 +22,22 @@ FLAG_OVERRIDE=""
 sitchcoPackagesDir="wp-content/sitchco-packages"
 
 while [[ $# -gt 0 ]]; do
-  case "$1" in --on|--off) FLAG_OVERRIDE="${1#--}";; esac
+  case "$1" in
+    --on|--off)
+      FLAG_OVERRIDE="${1#--}"
+      ;;
+    --reinforce)
+      FLAG_OVERRIDE="reinforce"
+      ;;
+  esac
   shift
 done
 
-local_mode=${FLAG_OVERRIDE:-$( [ -d "$sitchcoPackagesDir" ] && echo off || echo on )}
+if [ "$FLAG_OVERRIDE" = "reinforce" ]; then
+  local_mode=$( [ -d "$sitchcoPackagesDir" ] && echo on || echo off )
+else
+  local_mode=${FLAG_OVERRIDE:-$( [ -d "$sitchcoPackagesDir" ] && echo off || echo on )}
+fi
 
 # Check for required commands
 for cmd in git pnpm jq; do
