@@ -77,6 +77,7 @@ update: clean start ## Composer update
 	@ddev platform-update
 	@make
 	@ddev node-upgrade
+	@make container-sync
 
 update-review: ## Full reset and update process with manual comparison against a remote install for code changes and visual regression.
 	@ddev update-review
@@ -113,7 +114,7 @@ plugin-dev-mode: ## Toggles an alternate build process which clears and re-insta
 
 toggle-build-tools: ## Toggles the front-end build tooling packages
 	@ddev toggle-build-tools
-	@ddev mutagen sync
+	@make container-sync
 
 status: ## Show project status and tools
 	@ddev status
