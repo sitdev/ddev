@@ -1,7 +1,7 @@
 # Situation DDEV
 # Version: 0.1.0
 
-UPDATE_BRANCH="sitchco"
+UPDATE_BRANCH="test-hooks"
 .PHONY: *
 
 all: start install build container-sync
