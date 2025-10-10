@@ -1,0 +1,161 @@
+#!/usr/bin/env bash
+
+## Description: Run pre-commit checks on all platform themes using sitchco tooling.
+## Usage:       pre-commit [flags]
+## Flags:       [{"Name":"verbose","Usage":"Show detailed information about theme detection"}]
+
+set -euo pipefail
+
+# Configuration
+THEMES_DIR="wp-content/themes"
+VERBOSE=false
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --verbose)
+            VERBOSE=true
+            shift
+            ;;
+        *)
+            echo "Unknown option: $1" >&2
+            echo "Usage: $0 [--verbose]" >&2
+            exit 1
+            ;;
+    esac
+done
+
+# Logging functions
+log_verbose() {
+    if [[ "$VERBOSE" == "true" ]]; then
+        echo "VERBOSE: $1" >&2
+    fi
+}
+
+log_info() {
+    echo "INFO: $1" >&2
+}
+
+# Function to check if a theme declares sitchco-parent-theme as its template
+validate_parent_theme() {
+    local theme_dir="$1"
+    local style_css="$theme_dir/style.css"
+
+    if [[ ! -f "$style_css" ]]; then
+        log_verbose "No style.css found in $theme_dir"
+        return 1
+    fi
+
+    # Look for "Template: sitchco-parent-theme" in style.css (case insensitive)
+    if grep -i "^Template:\s*sitchco-parent-theme" "$style_css" >/dev/null 2>&1; then
+        log_verbose "Found sitchco-parent-theme template in $theme_dir/style.css"
+        return 0
+    else
+        log_verbose "Theme $theme_dir does not use sitchco-parent-theme"
+        return 1
+    fi
+}
+
+# Function to check if a theme has husky setup
+check_husky_setup() {
+    local theme_dir="$1"
+    local package_json="$theme_dir/package.json"
+    local husky_dir="$theme_dir/.husky"
+
+    if [[ ! -f "$package_json" ]]; then
+        log_verbose "No package.json found in $theme_dir"
+        return 1
+    fi
+
+    if [[ ! -d "$husky_dir" ]]; then
+        log_verbose "No .husky directory found in $theme_dir"
+        return 1
+    fi
+
+    log_verbose "Found Husky setup in $theme_dir"
+    return 0
+}
+
+# Function to find platform themes
+find_platform_themes() {
+    local platform_themes=()
+
+    # Look for themes that are in the git repo and have the required files
+    for theme_dir in "$THEMES_DIR"/*; do
+        if [[ -d "$theme_dir" ]]; then
+            theme_name=$(basename "$theme_dir")
+
+            # Check if theme is tracked by git
+            if git ls-files "$theme_dir" >/dev/null 2>&1; then
+                log_verbose "Found git-tracked theme: $theme_name"
+
+                # Check if theme has Husky setup and uses sitchco-parent-theme
+                if check_husky_setup "$theme_dir" && validate_parent_theme "$theme_dir"; then
+                    platform_themes+=("$theme_name")
+                    log_verbose "Platform theme validated: $theme_name"
+                else
+                    log_verbose "Theme $theme_name does not meet platform criteria"
+                fi
+            else
+                log_verbose "Theme $theme_name is not tracked by git"
+            fi
+        fi
+    done
+
+    # Only return non-empty theme names
+    for theme in "${platform_themes[@]}"; do
+        if [[ -n "$theme" ]]; then
+            printf '%s\n' "$theme"
+        fi
+    done
+}
+
+# Main execution
+log_info "Running pre-commit checks for platform themes..."
+
+# Find platform themes
+mapfile -t platform_themes < <(find_platform_themes)
+
+if [[ ${#platform_themes[@]} -eq 0 ]]; then
+    log_info "No platform themes found, skipping pre-commit checks"
+    exit 0
+fi
+
+log_info "Found platform themes: ${platform_themes[*]}"
+
+# Run pre-commit checks for each platform theme
+failed_themes=()
+
+for theme_name in "${platform_themes[@]}"; do
+    theme_dir="$THEMES_DIR/$theme_name"
+
+    echo "→ Checking theme: $theme_name"
+
+    if (
+        cd "$theme_dir"
+
+        # Use the precommit logic from the sitchco tooling
+        if [ -d "node_modules" ]; then
+            pnpm sitchco pre-commit
+        else
+            npx @sitchco/cli pre-commit
+        fi
+    ); then
+        echo "✓ Completed checks for $theme_name"
+    else
+        echo "✗ Failed checks for $theme_name"
+        failed_themes+=("$theme_name")
+    fi
+done
+
+# Report results
+if [[ ${#failed_themes[@]} -eq 0 ]]; then
+    echo "All pre-commit checks passed!"
+    exit 0
+else
+    echo ""
+    echo "Pre-commit checks failed for themes: ${failed_themes[*]}"
+    echo ""
+    echo "Please fix the issues above before committing."
+    exit 1
+fi

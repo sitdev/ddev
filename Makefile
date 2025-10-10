@@ -15,13 +15,18 @@ production: start install-production build container-sync ## Create the producti
 install: ## Install all dev dependencies
 	@ddev composer-install
 	@ddev node-install
+	@make setup-hooks
 
 install-production:
 	@ddev composer install -o --no-dev
 	@ddev node-install
+	@make setup-hooks
 
 build: ## Run front-end dev build
 	@ddev node-build
+
+setup-hooks: ## Install universal git hooks for platform themes
+	@ddev setup-git-hooks
 
 start: ## Turn on ddev
 	@if ! docker info >/dev/null 2>&1; then \
