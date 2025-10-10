@@ -56,24 +56,24 @@ validate_parent_theme() {
     fi
 }
 
-# Function to check if a theme has husky setup
-check_husky_setup() {
+# Function to check if a theme has Sitchco setup
+check_sitchco_setup() {
     local theme_dir="$1"
     local package_json="$theme_dir/package.json"
-    local husky_dir="$theme_dir/.husky"
 
     if [[ ! -f "$package_json" ]]; then
         log_verbose "No package.json found in $theme_dir"
         return 1
     fi
 
-    if [[ ! -d "$husky_dir" ]]; then
-        log_verbose "No .husky directory found in $theme_dir"
-        return 1
+    # Check if package.json contains @sitchco/cli or sitchco
+    if grep -q '"@sitchco/cli"' "$package_json" 2>/dev/null || grep -q '"sitchco"' "$package_json" 2>/dev/null; then
+        log_verbose "Found Sitchco setup in $theme_dir"
+        return 0
     fi
 
-    log_verbose "Found Husky setup in $theme_dir"
-    return 0
+    log_verbose "No Sitchco CLI found in $theme_dir"
+    return 1
 }
 
 # Function to find platform themes
@@ -89,8 +89,8 @@ find_platform_themes() {
             if git ls-files "$theme_dir" >/dev/null 2>&1; then
                 log_verbose "Found git-tracked theme: $theme_name"
 
-                # Check if theme has Husky setup and uses sitchco-parent-theme
-                if check_husky_setup "$theme_dir" && validate_parent_theme "$theme_dir"; then
+                # Check if theme has Sitchco setup and uses sitchco-parent-theme
+                if check_sitchco_setup "$theme_dir" && validate_parent_theme "$theme_dir"; then
                     platform_themes+=("$theme_name")
                     log_verbose "Platform theme validated: $theme_name"
                 else

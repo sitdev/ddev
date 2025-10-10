@@ -60,18 +60,22 @@ fi
 
 # Function to check if any platform themes exist (simplified check)
 has_platform_themes() {
-    # Look for any theme that has both package.json and .husky directory
+    # Look for any theme that has package.json with Sitchco setup
     # and is tracked by git
     for theme_dir in "$THEMES_DIR"/*; do
         if [[ -d "$theme_dir" ]]; then
             # Check if theme is tracked by git
             if git ls-files "$theme_dir" >/dev/null 2>&1; then
+                log_verbose "Found git-tracked theme: $theme_dir"
                 # Check for basic platform indicators
-                if [[ -f "$theme_dir/package.json" ]] && [[ -d "$theme_dir/.husky" ]]; then
+                if [[ -f "$theme_dir/package.json" ]]; then
                     # Check if it uses sitchco-parent-theme
                     if [[ -f "$theme_dir/style.css" ]] && grep -i "^Template:\s*sitchco-parent-theme" "$theme_dir/style.css" >/dev/null 2>&1; then
-                        log_verbose "Found platform theme: $(basename "$theme_dir")"
-                        return 0
+                        # Verify it has Sitchco CLI setup
+                        if grep -q '"@sitchco/cli"' "$theme_dir/package.json" 2>/dev/null || grep -q '"sitchco"' "$theme_dir/package.json" 2>/dev/null; then
+                            log_verbose "Found platform theme: $(basename "$theme_dir")"
+                            return 0
+                        fi
                     fi
                 fi
             fi
@@ -119,11 +123,11 @@ log_info "Setting up universal git hooks for platform themes..."
 
 # Check if any platform themes exist
 if ! has_platform_themes; then
-    log_info "No platform themes found with Husky setup - no hooks will be installed"
+    log_info "No platform themes found with Sitchco setup - no hooks will be installed"
     exit 0
 fi
 
-log_info "Found platform themes with Husky setup"
+log_info "Found platform themes with Sitchco setup"
 
 # Create hooks directory if it doesn't exist
 if [[ ! -d "$HOOKS_DIR" ]]; then
