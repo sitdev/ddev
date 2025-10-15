@@ -142,7 +142,9 @@ for theme_name in "${platform_themes[@]}"; do
         if [ -d "node_modules" ]; then
             pnpm sitchco pre-commit
         else
-            npx @sitchco/cli pre-commit
+            pnpm install
+            pnpm sitchco pre-commit
+            rm -rf node_modules
         fi
     ); then
         if [[ "$VERBOSE" == "true" ]]; then
