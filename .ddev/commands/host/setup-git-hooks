@@ -39,7 +39,9 @@ log_verbose() {
 }
 
 log_info() {
-    echo "INFO: $1"
+    if [[ "$VERBOSE" == "true" ]]; then
+        echo "INFO: $1"
+    fi
 }
 
 log_error() {
@@ -95,7 +97,8 @@ install_hook() {
         return 0
     fi
 
-    log_info "Installing hook: $hook_path"
+    # Always show when actually installing a hook
+    echo "Installing hook: $hook_path"
     echo "$hook_content" > "$hook_path"
     chmod +x "$hook_path"
 }

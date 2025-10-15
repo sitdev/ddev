@@ -33,7 +33,9 @@ log_verbose() {
 }
 
 log_info() {
-    echo "INFO: $1" >&2
+    if [[ "$VERBOSE" == "true" ]]; then
+        echo "INFO: $1" >&2
+    fi
 }
 
 # Function to check if a theme declares sitchco-parent-theme as its template
@@ -129,7 +131,9 @@ failed_themes=()
 for theme_name in "${platform_themes[@]}"; do
     theme_dir="$THEMES_DIR/$theme_name"
 
-    echo "→ Checking theme: $theme_name"
+    if [[ "$VERBOSE" == "true" ]]; then
+        echo "→ Checking theme: $theme_name"
+    fi
 
     if (
         cd "$theme_dir"
@@ -141,9 +145,17 @@ for theme_name in "${platform_themes[@]}"; do
             npx @sitchco/cli pre-commit
         fi
     ); then
-        echo "✓ Completed checks for $theme_name"
+        if [[ "$VERBOSE" == "true" ]]; then
+            echo "✓ Completed checks for $theme_name"
+        else
+            echo "✓ $theme_name"
+        fi
     else
-        echo "✗ Failed checks for $theme_name"
+        if [[ "$VERBOSE" == "true" ]]; then
+            echo "✗ Failed checks for $theme_name"
+        else
+            echo "✗ $theme_name"
+        fi
         failed_themes+=("$theme_name")
     fi
 done
