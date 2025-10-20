@@ -116,7 +116,10 @@ find_platform_themes() {
 log_info "Running pre-commit checks for platform themes..."
 
 # Find platform themes
-mapfile -t platform_themes < <(find_platform_themes)
+platform_themes=()
+while IFS= read -r theme; do
+    platform_themes+=("$theme")
+done < <(find_platform_themes)
 
 if [[ ${#platform_themes[@]} -eq 0 ]]; then
     log_info "No platform themes found, skipping pre-commit checks"
