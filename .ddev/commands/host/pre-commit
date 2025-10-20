@@ -4,7 +4,7 @@
 ## Usage:       pre-commit [flags]
 ## Flags:       [{"Name":"verbose","Usage":"Show detailed information about theme detection"}]
 
-set -euo pipefail
+set -eu
 
 # Configuration
 THEMES_DIR="wp-content/themes"
@@ -49,7 +49,7 @@ validate_parent_theme() {
     fi
 
     # Look for "Template: sitchco-parent-theme" in style.css (case insensitive)
-    if grep -i "^Template:\s*sitchco-parent-theme" "$style_css" >/dev/null 2>&1; then
+    if grep -i "^Template:[[:space:]]*sitchco-parent-theme" "$style_css" >/dev/null 2>&1; then
         log_verbose "Found sitchco-parent-theme template in $theme_dir/style.css"
         return 0
     else

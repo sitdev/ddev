@@ -4,7 +4,7 @@
 ## Usage:       setup-git-hooks [flags]
 ## Flags:       [{"Name":"dry-run","Usage":"Show what would be done without making changes"},{"Name":"verbose","Usage":"Show detailed information about theme detection"}]
 
-set -euo pipefail
+set -eu
 
 # Configuration
 THEMES_DIR="wp-content/themes"
@@ -72,7 +72,7 @@ has_platform_themes() {
                 # Check for basic platform indicators
                 if [[ -f "$theme_dir/package.json" ]]; then
                     # Check if it uses sitchco-parent-theme
-                    if [[ -f "$theme_dir/style.css" ]] && grep -i "^Template:\s*sitchco-parent-theme" "$theme_dir/style.css" >/dev/null 2>&1; then
+                    if [[ -f "$theme_dir/style.css" ]] && grep -i "^Template:[[:space:]]*sitchco-parent-theme" "$theme_dir/style.css" >/dev/null 2>&1; then
                         # Verify it has Sitchco CLI setup
                         if grep -q '"@sitchco/cli"' "$theme_dir/package.json" 2>/dev/null || grep -q '"sitchco"' "$theme_dir/package.json" 2>/dev/null; then
                             log_verbose "Found platform theme: $(basename "$theme_dir")"
@@ -113,8 +113,10 @@ hook_needs_update() {
         return 0  # Hook doesn't exist, needs to be created
     fi
 
-    # Compare content
-    if ! echo "$hook_content" | cmp -s "$hook_path" -; then
+    # Compare content - use a more portable comparison method
+    local current_content
+    current_content=$(cat "$hook_path")
+    if [ "$hook_content" != "$current_content" ]; then
         return 0  # Hook exists but content is different
     fi
 
@@ -144,7 +146,7 @@ fi
 PRE_COMMIT_HOOK_TEMPLATE="#!/bin/bash
 
 # Pre-commit hook for platform themes - calls DDEV host command
-set -euo pipefail
+set -eu
 
 # Call the DDEV pre-commit host command
 bash .ddev/commands/host/pre-commit \"\$@\""
