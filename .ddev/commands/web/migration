@@ -1,95 +1,422 @@
 #!/usr/bin/env bash
 
-## Description: Migration menu
+## Description: Interactive migration menu for WP Migrate Pro
 ## Usage: migration
-## Example: "ddev migration" or "ddev migration pull-staging" or "ddev migration export"
+## Example: "ddev migration"
 
-# On load:
-# Check for all connection strings
-# construct migration profiles if files don't exist
-# Show action dialog
+set -euo pipefail
 
-#action=$1
-#TEMP_FILE=~/connection-string.txt
-#CONNECTIONS_FILE=.conf/connections.yaml
-#mkdir -p .conf/migrations
-#LOCAL_DOMAIN=$(echo $DDEV_PRIMARY_URL | replace "https://" "" -z)
-#
-#if [[ "${action}" = "export" ]]; then
-#  sh .ddev/commands/web/export-migration
-#  exit
-#fi
-#
-#buildProfiles() {
-#  if [ -f $CONNECTIONS_FILE ]; then
-#    for environment in $(yq 'to_entries | .[] | .key' $CONNECTIONS_FILE); do
-#      connectionString=$(bash ~/bin/decode "$(yq ".${environment}.connection" $CONNECTIONS_FILE)")
-#      echo "${connectionString}" | head -1 >$TEMP_FILE
-#      replace "https://" "" $TEMP_FILE --silent
-#      replace "/wp" "" $TEMP_FILE --silent
-#      remoteDomain=$(cat $TEMP_FILE)
-#      rm -f $TEMP_FILE
-#
-#      if [ ! -f ".conf/migrations/pull-${environment}.yaml" ]; then
-#        cp .ddev/migrations/pull-template.yaml ".conf/migrations/pull-${environment}.yaml"
-#        yq ".profiles[0].connection_info = \"${connectionString}\"" -i ".conf/migrations/pull-${environment}.yaml"
-#        replace "{{remote-domain}}" "${remoteDomain}" ".conf/migrations/pull-${environment}.yaml" --silent
-#        replace "{{local-domain}}" "${LOCAL_DOMAIN}" ".conf/migrations/pull-${environment}.yaml" --silent
-#      fi
-#      if [[ ! -f ".conf/migrations/push-${environment}.yaml" ]] && [[ ${environment} != "production" ]]; then
-#        cp .ddev/migrations/push-template.yaml ".conf/migrations/push-${environment}.yaml"
-#        yq ".profiles[0].connection_info = \"${connectionString}\"" -i ".conf/migrations/push-${environment}.yaml"
-#        replace "{{remote-domain}}" "${remoteDomain}" ".conf/migrations/push-${environment}.yaml" --silent
-#        replace "{{local-domain}}" "${LOCAL_DOMAIN}" ".conf/migrations/push-${environment}.yaml" --silent
-#      fi
-#    done
-#  else
-#    echo "---" > $CONNECTIONS_FILE
-#  fi
-#}
-#registerConnection() {
-#  touch $TEMP_FILE
-#  connectionString=$(dialog --erase-on-exit --title "Enter Remote Connection String" --editbox $TEMP_FILE 23 70 3>&1 1>&2 2>&3)
-#  envName=$(dialog --erase-on-exit --title "Environment Name" --inputbox "Name of environment? [staging|production|custom]" 23 70 staging 3>&1 1>&2 2>&3)
-#  rm -f $TEMP_FILE
-#  encoded=$(bash ~/bin/encode "${connectionString}")
-#  if [[ -n "${connectionString}" ]] && [[ -n "${envName}" ]]; then
-#    find .conf/migrations -type f -name "*-${envName}.yaml" -prune -exec rm -f {} \;
-#    yq ".$envName.connection = \"$encoded\"" -i $CONNECTIONS_FILE
-#    git add $CONNECTIONS_FILE
-#    buildProfiles
-#    showMenu
-#  fi
-#}
-#
-#showMenu() {
-#  options=()
-#  existingMigrations=$(ls .conf/migrations | grep ".yaml" | sed -e 's/\.yaml//')
-#  if [ -z "${existingMigrations}" ]; then
-#    registerConnection
-#    exit
-#  fi
-#  for item in $existingMigrations; do
-#    label=$(cat .conf/migrations/${item}.yaml | grep "name" | replace "name:" "" -z | xargs)
-#    options+=("${item}" "${label}")
-#  done
-#  options+=("register" "Add new remote connection string")
-#  options+=("export" "Export existing migration")
-#  options+=("exit" "Exit Application")
-#  choice=$(dialog --erase-on-exit --title "Migration Options" --menu "Choose an option:" 23 70 15 "${options[@]}" 3>&1 1>&2 2>&3)
-#  if [ ! -z "${choice}" ]; then
-#    if [[ "${choice}" = "register" ]]; then
-#      registerConnection
-#    elif [[ "${choice}" = "export" ]]; then
-#      /bin/bash .ddev/commands/web/export-migration
-#      showMenu
-#      exit
-#    elif [[ "${choice}" = "exit" ]]; then
-#      exit
-#    else
-#      /bin/bash .ddev/commands/web/run-migration "${choice}"
-#    fi
-#  fi
-#}
-#buildProfiles
-#showMenu
+# Configuration
+CONNECTIONS_FILE=".conf/migrations/connections.json"
+
+# Ensure connections file exists
+ensure_connections_file() {
+  if [ ! -f "$CONNECTIONS_FILE" ]; then
+    mkdir -p "$(dirname "$CONNECTIONS_FILE")"
+    echo "{}" > "$CONNECTIONS_FILE"
+    echo "Created new connections file: $CONNECTIONS_FILE"
+  fi
+}
+
+# Check if gum is available, fallback to basic prompts
+has_gum() {
+  command -v gum >/dev/null 2>&1
+}
+
+# Safe prompt function with fallback
+prompt_input() {
+  local prompt_text="$1"
+  local placeholder="${2:-}"
+  local result=""
+
+  if has_gum; then
+    if [ -n "$placeholder" ]; then
+      result=$(gum input --placeholder "$placeholder" --prompt "$prompt_text ")
+      # If empty and placeholder provided, use placeholder as default
+      if [ -z "$result" ]; then
+        result="$placeholder"
+      fi
+    else
+      result=$(gum input --prompt "$prompt_text ")
+    fi
+  else
+    read -p "$prompt_text " result
+    # If empty and placeholder provided, use placeholder as default
+    if [ -z "$result" ] && [ -n "$placeholder" ]; then
+      result="$placeholder"
+    fi
+  fi
+
+  echo "$result"
+}
+
+# Safe confirm function with fallback
+prompt_confirm() {
+  local prompt_text="$1"
+
+  if has_gum; then
+    gum confirm "$prompt_text"
+  else
+    read -p "$prompt_text (y/N) " -n 1 -r
+    echo
+    [[ $REPLY =~ ^[Yy]$ ]]
+  fi
+}
+
+# Safe choose function with fallback
+prompt_choose() {
+  local prompt_text="$1"
+  shift
+  local options=("$@")
+
+  if has_gum; then
+    gum choose --header "$prompt_text" "${options[@]}"
+  else
+    echo "$prompt_text" >&2
+    local i=1
+    for opt in "${options[@]}"; do
+      echo "$i) $opt" >&2
+      ((i++))
+    done
+    read -p "Enter choice (1-${#options[@]}): " choice
+    if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#options[@]}" ]; then
+      echo "${options[$((choice-1))]}"
+    else
+      return 1
+    fi
+  fi
+}
+
+# Parse combined connection string (format: "https://example.com secret-key")
+parse_connection_string() {
+  local input="$1"
+  local url=""
+  local secret=""
+
+  # Try to parse as "URL SECRET" format
+  if [[ "$input" =~ ^(https?://[^[:space:]]+)[[:space:]]+([^[:space:]]+)$ ]]; then
+    url="${BASH_REMATCH[1]}"
+    secret="${BASH_REMATCH[2]}"
+  else
+    # Not a combined format, return empty
+    return 1
+  fi
+
+  echo "$url"
+  echo "$secret"
+}
+
+# Add a new connection
+add_connection() {
+  ensure_connections_file
+
+  echo ""
+  echo "=================================================="
+  echo "Add New Connection"
+  echo "=================================================="
+  echo ""
+  echo "You can paste the combined connection string from WP Migrate Pro"
+  echo "(format: 'https://example.com secret-key') or enter details separately."
+  echo ""
+
+  # Get connection string
+  connection_input=$(prompt_input "Connection string or URL:" "https://example.com secret-key")
+
+  if [ -z "$connection_input" ]; then
+    echo "Cancelled."
+    return
+  fi
+
+  # Try to parse combined format
+  local url=""
+  local secret=""
+  if parsed=$(parse_connection_string "$connection_input" 2>&1); then
+    url=$(echo "$parsed" | sed -n '1p')
+    secret=$(echo "$parsed" | sed -n '2p')
+    echo "✓ Parsed combined connection string"
+  else
+    # Single field, assume it's just the URL
+    url="$connection_input"
+    secret=$(prompt_input "Secret key:" "your-secret-key-here")
+  fi
+
+  if [ -z "$url" ] || [ -z "$secret" ]; then
+    echo "Error: URL and secret key are required."
+    return 1
+  fi
+
+  # Get branch name
+  branch=$(prompt_input "Branch name:" "develop")
+  if [ -z "$branch" ]; then
+    echo "Error: Branch name is required."
+    return 1
+  fi
+
+  # Check if connection already exists
+  if jq -e ".\"$branch\"" "$CONNECTIONS_FILE" >/dev/null 2>&1; then
+    echo ""
+    echo "Warning: Connection '$branch' already exists."
+    if ! prompt_confirm "Overwrite existing connection?"; then
+      echo "Cancelled."
+      return
+    fi
+  fi
+
+  # Optional label
+  label=$(prompt_input "Display label (optional):" "$branch")
+  if [ -z "$label" ]; then
+    label="$branch"
+  fi
+
+  # Optional description
+  description=$(prompt_input "Description (optional):" "")
+
+  # Build JSON object
+  local connection_obj
+  connection_obj=$(jq -n \
+    --arg url "$url" \
+    --arg secret "$secret" \
+    --arg lbl "$label" \
+    --arg desc_text "$description" \
+    '{url: ($url), secret: ($secret), label: ($lbl), description: ($desc_text)}')
+
+  # Remove description field if empty
+  if [ -z "$description" ]; then
+    connection_obj=$(echo "$connection_obj" | jq 'del(.description)')
+  fi
+
+  # Update connections file
+  jq ".\"$branch\" = $connection_obj" "$CONNECTIONS_FILE" > "${CONNECTIONS_FILE}.tmp"
+  mv "${CONNECTIONS_FILE}.tmp" "$CONNECTIONS_FILE"
+
+  echo ""
+  echo "✓ Connection '$branch' saved successfully!"
+  echo ""
+}
+
+# List all connections
+list_connections() {
+  ensure_connections_file
+
+  echo ""
+  echo "=================================================="
+  echo "Configured Connections"
+  echo "=================================================="
+  echo ""
+
+  if [ "$(jq 'length' "$CONNECTIONS_FILE")" -eq 0 ]; then
+    echo "No connections configured yet."
+    echo "Use 'Add Connection' to create one."
+    echo ""
+    return
+  fi
+
+  jq -r 'to_entries[] | "  [\(.key)] \(.value.label // .key)\n    URL: \(.value.url)\n    Description: \(.value.description // "(none)")\n"' "$CONNECTIONS_FILE"
+
+  echo ""
+}
+
+# Pull from a connection
+pull_connection() {
+  ensure_connections_file
+
+  # Check if any connections exist
+  if [ "$(jq 'length' "$CONNECTIONS_FILE")" -eq 0 ]; then
+    echo ""
+    echo "No connections configured yet."
+    echo "Please add a connection first."
+    echo ""
+    return
+  fi
+
+  echo ""
+  echo "=================================================="
+  echo "Pull from Remote"
+  echo "=================================================="
+  echo ""
+
+  # Get list of connections
+  mapfile -t branches < <(jq -r 'keys[]' "$CONNECTIONS_FILE")
+  mapfile -t labels < <(jq -r 'to_entries[] | "\(.key): \(.value.label // .key)"' "$CONNECTIONS_FILE")
+
+  # Choose connection
+  selected=$(prompt_choose "Select connection:" "${labels[@]}")
+  if [ -z "$selected" ]; then
+    echo "Cancelled."
+    return
+  fi
+
+  # Extract branch from selection
+  branch=$(echo "$selected" | cut -d: -f1)
+
+  echo ""
+  if ! prompt_confirm "Pull database from '$branch' (will overwrite local database)?"; then
+    echo "Cancelled."
+    return
+  fi
+
+  # Choose media handling strategy
+  echo ""
+  echo "Note: For faster media sync via rsync, use 'make pull-staging' or 'make pull-production'"
+  echo ""
+  media_strategy=$(prompt_choose "How should media be handled?" \
+    "Include media (synced via WP Migrate Pro)" \
+    "Skip media (database only)")
+
+  local migration_result=0
+  case "$media_strategy" in
+    "Include"*)
+      # Include media via WP Migrate Pro
+      bash .ddev/commands/web/run-migration "$branch"
+      migration_result=$?
+      ;;
+    "Skip"*)
+      # Skip media entirely
+      bash .ddev/commands/web/run-migration "$branch" --skip-media
+      migration_result=$?
+      ;;
+    *)
+      echo "Invalid selection"
+      return 1
+      ;;
+  esac
+
+  if [ $migration_result -eq 0 ]; then
+    echo ""
+    echo "✓ Migration completed. Exiting..."
+    exit 0
+  else
+    echo ""
+    echo "✗ Migration failed."
+    echo ""
+    echo "Press Enter to return to menu..."
+    read
+    return 1
+  fi
+}
+
+# Push to a connection
+push_connection() {
+  ensure_connections_file
+
+  # Check if any connections exist
+  if [ "$(jq 'length' "$CONNECTIONS_FILE")" -eq 0 ]; then
+    echo ""
+    echo "No connections configured yet."
+    echo "Please add a connection first."
+    echo ""
+    return
+  fi
+
+  echo ""
+  echo "=================================================="
+  echo "Push to Remote"
+  echo "=================================================="
+  echo ""
+  echo "⚠️  WARNING: This will OVERWRITE the remote database!"
+  echo ""
+
+  # Get list of connections (excluding production)
+  mapfile -t branches < <(jq -r 'keys[] | select(. != "master" and . != "production")' "$CONNECTIONS_FILE")
+
+  if [ ${#branches[@]} -eq 0 ]; then
+    echo "No non-production connections available for push."
+    echo "Push to production is disabled for safety."
+    echo ""
+    return
+  fi
+
+  mapfile -t labels < <(jq -r 'to_entries[] | select(.key != "master" and .key != "production") | "\(.key): \(.value.label // .key)"' "$CONNECTIONS_FILE")
+
+  # Choose connection
+  selected=$(prompt_choose "Select connection:" "${labels[@]}")
+  if [ -z "$selected" ]; then
+    echo "Cancelled."
+    return
+  fi
+
+  # Extract branch from selection
+  branch=$(echo "$selected" | cut -d: -f1)
+
+  echo ""
+  echo "⚠️  FINAL WARNING ⚠️"
+  echo "This will push your LOCAL database to:"
+  echo "  Branch: $branch"
+  echo ""
+
+  if ! prompt_confirm "Are you absolutely sure you want to continue?"; then
+    echo "Cancelled. No changes made."
+    return
+  fi
+
+  # Get connection details
+  REMOTE_URL=$(jq -r ".\"$branch\".url" "$CONNECTIONS_FILE")
+  SECRET_KEY=$(jq -r ".\"$branch\".secret" "$CONNECTIONS_FILE")
+
+  # Execute push
+  echo ""
+  echo "Pushing database..."
+
+  if wp migrate push --remote-url="$REMOTE_URL" --secret-key="$SECRET_KEY" --url=${DDEV_PRIMARY_URL}; then
+    echo ""
+    echo "✓ Database pushed successfully!"
+    echo ""
+    echo "✓ Push completed. Exiting..."
+    exit 0
+  else
+    echo ""
+    echo "✗ Push failed."
+    echo ""
+    echo "Press Enter to return to menu..."
+    read
+    return 1
+  fi
+}
+
+# Main menu loop
+main_menu() {
+  ensure_connections_file
+
+  while true; do
+    clear
+    echo "=================================================="
+    echo "WP Migrate Pro - Migration Management"
+    echo "=================================================="
+    echo ""
+
+    action=$(prompt_choose "What would you like to do?" \
+      "Pull from remote" \
+      "Push to remote" \
+      "Add connection" \
+      "List connections" \
+      "Exit")
+
+    case "$action" in
+      "Pull"*)
+        pull_connection
+        ;;
+      "Push"*)
+        push_connection
+        ;;
+      "Add"*)
+        add_connection
+        ;;
+      "List"*)
+        list_connections
+        read -p "Press Enter to continue..."
+        ;;
+      "Exit")
+        echo ""
+        echo "Goodbye!"
+        exit 0
+        ;;
+      *)
+        echo "Invalid selection"
+        sleep 1
+        ;;
+    esac
+  done
+}
+
+# Run main menu
+main_menu

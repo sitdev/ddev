@@ -51,6 +51,13 @@ if [ "$#" -gt 0 ]; then
             break
         fi
     done
+
+    # If argument was provided but not found, exit with error
+    if [ -z "$selected_profile" ]; then
+        echo "Error: Profile '$1' not found" >&2
+        echo "Available profiles: ${deployment_profiles[*]}" >&2
+        exit 1
+    fi
 fi
 
 # Displaying deployment profiles and handling user input if no valid argument was provided

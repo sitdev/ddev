@@ -9,7 +9,7 @@ For Windows, see [Setting up DDEV on Windows](https://www.google.com/search?q=do
 ### OrbStack
 
 We recommend using OrbStack as your Docker provider. It is a fast, lightweight, and easy-to-use replacement for Docker
-Desktop and Colima.
+Desktop.
 
 1. **Install OrbStack:**
    ```shell
