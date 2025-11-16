@@ -27,10 +27,12 @@ build-production:
 
 start: ## Turn on ddev
 	@if ! docker info >/dev/null 2>&1; then \
-		if command -v colima >/dev/null 2>&1; then \
-		  colima start; \
+		if command -v orbctl >/dev/null 2>&1; then \
+		  orbctl app start >/dev/null 2>&1 || orbctl start >/dev/null 2>&1 || true; \
+		elif command -v open >/dev/null 2>&1; then \
+		  open -ga OrbStack >/dev/null 2>&1; \
 		else \
-			echo "Docker doesn't appear to be running"; \
+			echo "Docker doesn't appear to be running (tried to launch OrbStack)"; \
 			exit 1; \
 		fi; \
   	fi
