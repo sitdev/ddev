@@ -15,6 +15,7 @@ source "${script_root}/bin/create-settings.sh"
 if [ -d .git ]; then
   grep -q ".ddev" .gitignore || echo '/.ddev' >>.gitignore
   grep -q ".conf/migrations" .gitignore || echo '/.conf/migrations/*' >>.gitignore
+  grep -q "llms.txt" .gitignore || echo '/llms.txt' >>.gitignore
 
   if [ ! -f .git/hooks/post-checkout ]; then
     mkdir -p .git/hooks
