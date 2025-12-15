@@ -97,7 +97,7 @@ if [ "$local_mode" = "on" ]; then
             # extract all @sitchco dependency names (strip the prefix)
             mapfile -t wantedPackages < <(
                 jq -r '
-                    ( .dependencies // {} + .devDependencies // {} )
+                    (.dependencies // {}) + (.devDependencies // {})
                     | keys[]
                     | select(startswith("@sitchco/"))
                     | sub("^@sitchco/";"")
@@ -106,7 +106,7 @@ if [ "$local_mode" = "on" ]; then
 
             if [ ${#wantedPackages[@]} -eq 0 ]; then
                 echo "→ No @sitchco deps found in $targetName; skipping."
-                continue
+                exit 0
             fi
 
             # for each wanted package, find its path and link
