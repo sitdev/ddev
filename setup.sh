@@ -43,4 +43,4 @@ if [[ "$revision" != "$old_revision" ]]; then
 fi
 
 cp "${script_root}/Makefile" ./
-git add -A .
+git add .gitignore Makefile README.md 2>/dev/null || true
