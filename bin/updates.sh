@@ -4,7 +4,7 @@ updateSettingsFile() {
   local file=$1
   tail -n +2 "$1" | sed -e 's/export //g' >.conf/.env
   rm -f "${file}"
-  git add -A .
+  git add .conf/.env .conf/settings 2>/dev/null || true
 }
 
 updateConnectionsFile() {
@@ -16,7 +16,7 @@ updateConnectionsFile() {
     echo "  connection: ${encodedConnectionString}" >>"$output"
   done <"$file"
   rm -f "$file"
-  git add -A .
+  git add .conf/connections.yaml .conf/.connections 2>/dev/null || true
 }
 
 if [ -f .conf/settings ]; then

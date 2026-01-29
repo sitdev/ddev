@@ -4,7 +4,7 @@
 
 ddev clean-build
 mv wp-content/uploads ./ && rm -rf wp-content && mkdir -p wp-content && mv uploads wp-content/
-git add -A .
+git clean -fd
 git reset --hard
 git fetch
 git pull
