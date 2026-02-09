@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+
+## Description: Enable Redis object cache for testing cache-dependent features.
+## Usage: enable-redis
+## Example: ddev enable-redis
+
+LOCAL_CONFIG="${DDEV_APPROOT}/${DDEV_DOCROOT}/local-config.php"
+
+if grep -q '// \[ddev:redis\]' "$LOCAL_CONFIG" 2>/dev/null; then
+  echo "Redis config already present in local-config.php. Re-applying infrastructure..."
+else
+  cat <<'EOT' >> "$LOCAL_CONFIG"
+// [ddev:redis]
+define('WP_REDIS_HOST', 'redis');
+define('WP_REDIS_PORT', 6379);
+// [/ddev:redis]
+EOT
+fi
+
+ddev add-on get ddev/ddev-redis
+ddev restart
+
+ddev wp plugin is-installed redis-cache 2>/dev/null \
+  && ddev wp plugin activate redis-cache 2>/dev/null \
+  || true
+
+cat <<'EOF'
+
+Redis enabled and connected as WordPress object cache.
+
+Useful commands:
+  ddev wp redis status           # Check connection status
+  ddev redis-cli ping            # Should return PONG
+  ddev redis-cli DBSIZE          # Show cached key count
+  ddev redis-cli FLUSHALL        # Clear all cached data
+  ddev redis-cli monitor         # Watch Redis commands in real time
+
+To disable: run `make restart` to rebuild the default environment.
+EOF
