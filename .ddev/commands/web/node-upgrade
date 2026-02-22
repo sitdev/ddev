@@ -24,9 +24,18 @@ for target in "${buildTargets[@]}"; do
         sitchco_dev_deps=$(jq -r '.devDependencies // {} | keys[] | select(contains("sitchco"))' package.json)
         if [ -n "$sitchco_dev_deps" ]; then
             echo "=== Updating: ${targetName} ==="
-            find . -type d -name node_modules -prune -exec rm -rf {} \;
+            pkg_hash_before=$(md5sum package.json | cut -d' ' -f1)
+            cp pnpm-lock.yaml pnpm-lock.yaml.bak 2>/dev/null || true
             pnpm up ${sitchco_dev_deps} --latest
-            pnpm install
+            pkg_hash_after=$(md5sum package.json | cut -d' ' -f1)
+            if [ "$pkg_hash_before" = "$pkg_hash_after" ]; then
+                echo "No version changes, reverting lock file"
+                mv pnpm-lock.yaml.bak pnpm-lock.yaml 2>/dev/null || true
+            else
+                rm -f pnpm-lock.yaml.bak
+                find . -type d -name node_modules -prune -exec rm -rf {} \;
+                pnpm install
+            fi
         fi
         echo ""
     )
