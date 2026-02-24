@@ -11,8 +11,8 @@ if grep -q '// \[ddev:redis\]' "$LOCAL_CONFIG" 2>/dev/null; then
 else
   cat <<'EOT' >> "$LOCAL_CONFIG"
 // [ddev:redis]
-define('WP_REDIS_HOST', 'redis');
-define('WP_REDIS_PORT', 6379);
+const WP_REDIS_HOST = 'redis';
+const WP_REDIS_PORT = 6379;
 // [/ddev:redis]
 EOT
 fi
