@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
 ## Description: Set up and run phpunit
+## Usage: test-phpunit [-- [phpunit options]]
+## Example: "ddev test-phpunit" or "ddev test-phpunit -- --filter 'ContentTargeting\|CustomTags'" (escape pipes with backslash for OR filters)
 
 if [ ! -f phpunit.xml ]; then
   echo "No phpunit.xml, exiting"
@@ -15,4 +17,13 @@ if [ ! -f local-tests-config.php ]; then
 fi
 jq --indent 4 '.scripts.test = "phpunit"' composer.json > composer.json.tmp && mv composer.json.tmp composer.json
 
-composer test
+if [ "$1" = "--" ]; then
+  shift
+fi
+
+if [[ " $* " =~ " --filter " ]] || [[ "$*" == *--filter=* ]]; then
+  echo "Running: phpunit $*" >&2
+  echo "Tip: Escape pipes for OR filters: --filter 'Foo\|Bar'" >&2
+fi
+
+composer test -- "$@"
