@@ -21,12 +21,12 @@ for target in "${buildTargets[@]}"; do
         cd "$target" || continue
 
         targetName=$(basename "$target")
-        sitchco_dev_deps=$(jq -r '.devDependencies // {} | keys[] | select(contains("sitchco"))' package.json)
-        if [ -n "$sitchco_dev_deps" ]; then
+        sitchco_deps=$(jq -r '(.devDependencies // {}) + (.dependencies // {}) | keys[] | select(contains("sitchco"))' package.json)
+        if [ -n "$sitchco_deps" ]; then
             echo "=== Updating: ${targetName} ==="
             pkg_hash_before=$(md5sum package.json | cut -d' ' -f1)
             cp pnpm-lock.yaml pnpm-lock.yaml.bak 2>/dev/null || true
-            pnpm up ${sitchco_dev_deps} --latest
+            pnpm up ${sitchco_deps} --latest
             pkg_hash_after=$(md5sum package.json | cut -d' ' -f1)
             if [ "$pkg_hash_before" = "$pkg_hash_after" ]; then
                 echo "No version changes, reverting lock file"
