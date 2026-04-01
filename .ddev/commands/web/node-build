@@ -15,6 +15,12 @@ if [ -n "$PLUGIN_DEV_MODE" ]; then
     "$scriptRoot/toggle-build-tools" --reinforce --skip-target-install
 fi
 
+sitchcoPackagesDir="wp-content/sitchco-packages"
+if [ -d "$sitchcoPackagesDir" ]; then
+    echo "Building sitchco-packages…"
+    (cd "$sitchcoPackagesDir" && pnpm run build)
+fi
+
 for target in "${buildTargets[@]}"; do
     targetName=$(basename $target)
     (
