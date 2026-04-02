@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 [ -f .ddev/.plugin-dev-mode ] && pluginDevMode=1 || true
 rm -rf .ddev
-git add -A .
+git rm -r --cached .ddev 2>/dev/null || true
 cp -r "${script_root}/.ddev" ./
 [ -z "${pluginDevMode}" ] || touch .ddev/.plugin-dev-mode
 cat <<EOT > .ddev/config.local.yaml

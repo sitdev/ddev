@@ -17,7 +17,12 @@ clean_directories() {
 }
 
 clean_theme_directories() {
-  find wp-content/themes -type d \( -name "node_modules" -o -name "bower_components" -o -name "dist" \) -prune -exec rm -rf {} +
+  find wp-content/themes -type d \( -name "node_modules" -o -name "bower_components" \) -prune -exec rm -rf {} +
+  for theme_dir in wp-content/themes/*/; do
+    if [ -f "${theme_dir}package.json" ]; then
+      rm -rf "${theme_dir}dist"
+    fi
+  done
 }
 
 clean_mu_plugins() {

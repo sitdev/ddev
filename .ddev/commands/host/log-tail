@@ -2,9 +2,20 @@
 
 ## Description: Tail the log, but only show php errors
 
-ddev logs -f --tail 10 |
-  grep --line-buffered "said into stderr:\|, referer" |
-  sed -u 's/^.*into stderr: "//g' |
-  sed -u 's/"$//g' |
-  sed -u 's/NOTICE: PHP message: //g' |
-  sed -u 's/^.*, referer/referer/g'
+ddev logs -f --tail 10 | perl -ne '
+    # Skip Apache error log lines entirely
+    next if /^\[(Mon|Tue|Wed|Thu|Fri|Sat|Sun)/;
+
+    # Handle clean NOTICE format - strip the prefix
+    if (/^NOTICE: PHP message: (.*)/) {
+        print $1 . "\n";
+        next;
+    }
+
+    # Keep continuation lines (JSON, arrays, etc.) that start with whitespace or JSON chars
+    # but aren'\''t Apache log timestamps
+    if (/^[\s{}\[\]",]/) {
+        print;
+        next;
+    }
+'

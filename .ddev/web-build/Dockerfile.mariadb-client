@@ -1,0 +1,1 @@
+RUN DDEV_DATABASE=mariadb:10.11 mariadb-client-install.sh

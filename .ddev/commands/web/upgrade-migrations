@@ -1,0 +1,324 @@
+#!/usr/bin/env node
+
+/**
+ * ## Description: Run all composer package upgrade migrations
+ * ## Usage: upgrade-migrations [--dry-run]
+ * ## Example: "ddev upgrade-migrations"
+ */
+
+const fs = require('fs');
+const path = require('path');
+const { execSync } = require('child_process');
+
+// Package mapping for Gravity Forms migration
+const GRAVITY_FORMS_MAP = {
+  'situation/gravityforms': 'gravity/gravityforms',
+  'situation/gravity-forms-akismet': 'gravity/gravityformsakismet',
+  'situation/gravity-forms-dropbox': 'gravity/gravityformsdropbox',
+  'situation/gravity-forms-mailchimp': 'gravity/gravityformsmailchimp',
+  'situation/gravity-forms-salesforce-crm-perks': 'gravity/gravityformssalesforce',
+  'situation/gravity-forms-webhooks': 'gravity/gravityformswebhooks',
+  'situation/gravity-forms-zapier': 'gravity/gravityformszapier',
+  'situation/gravityforms-advanced-post-creation': 'gravity/gravityformsadvancedpostcreation',
+  'situation/gravityforms-constantcontact': 'gravity/gravityformsconstantcontact',
+  'situation/gravityformssalesforce': 'gravity/gravityformssalesforce',
+  // Note: situation/gravityforms-eloqua and situation/gravity-form-infusionsoft are 3rd party
+  // and intentionally not included in this mapping
+};
+
+const GRAVITY_FORMS_REPO = {
+  type: 'composer',
+  url: 'https://composer.gravity.io'
+};
+
+const ACF_PRO_REPO = {
+  type: 'composer',
+  url: 'https://connect.advancedcustomfields.com'
+};
+
+const dryRun = process.argv.includes('--dry-run');
+
+/**
+ * Migrate kint-php from version 2.0 to latest
+ */
+function migrateKint(composer) {
+  let changed = false;
+
+  // Check if we're using the old kint version
+  if (composer.require && composer.require['kint-php/kint'] === '^2.0') {
+    composer.require['kint-php/kint'] = '*';
+    changed = true;
+  }
+
+  if (composer['require-dev'] && composer['require-dev']['kint-php/kint'] === '^2.0') {
+    composer['require-dev']['kint-php/kint'] = '*';
+    changed = true;
+  }
+
+  // Remove extra.kint config if it exists
+  if (composer.extra && composer.extra.kint !== undefined) {
+    delete composer.extra.kint;
+    changed = true;
+  }
+
+  return changed;
+}
+
+/**
+ * Remove tabrisrp repository
+ */
+function migrateTabrisrp(composer) {
+  if (!composer.repositories || !Array.isArray(composer.repositories)) {
+    return false;
+  }
+
+  const originalLength = composer.repositories.length;
+  composer.repositories = composer.repositories.filter(repo => {
+    return !(repo.url && repo.url.includes('tabrisrp'));
+  });
+
+  return composer.repositories.length !== originalLength;
+}
+
+/**
+ * Migrate ACF Pro from situation to wpengine
+ */
+function migrateAcfPro(composer) {
+  let changed = false;
+
+  // Check if we're using the old ACF Pro package
+  const oldPackage = 'situation/advanced-custom-fields-pro';
+  const newPackage = 'wpengine/advanced-custom-fields-pro';
+
+  if (composer.require && composer.require[oldPackage]) {
+    delete composer.require[oldPackage];
+    composer.require[newPackage] = '*';
+    changed = true;
+
+    // Add ACF Pro repository if not present
+    if (!hasRepository(composer, ACF_PRO_REPO.url)) {
+      composer.repositories = composer.repositories || [];
+      composer.repositories.push(ACF_PRO_REPO);
+    }
+  }
+
+  return changed;
+}
+
+/**
+ * Migrate Gravity Forms packages from situation to official gravity repos
+ * Returns array of migrated package names (or empty array if none)
+ */
+function migrateGravityForms(composer) {
+  const migratedPackages = [];
+
+  if (!composer.require) {
+    return migratedPackages;
+  }
+
+  // Check for any gravity forms packages that need migration
+  for (const [oldPackage, newPackage] of Object.entries(GRAVITY_FORMS_MAP)) {
+    if (composer.require[oldPackage]) {
+      delete composer.require[oldPackage];
+      composer.require[newPackage] = '*';
+      migratedPackages.push(oldPackage);
+    }
+  }
+
+  // If we migrated any packages, add the repository
+  if (migratedPackages.length > 0 && !hasRepository(composer, GRAVITY_FORMS_REPO.url)) {
+    composer.repositories = composer.repositories || [];
+    composer.repositories.push(GRAVITY_FORMS_REPO);
+  }
+
+  return migratedPackages;
+}
+
+/**
+ * Normalize repositories to array format (handles both array and object)
+ */
+function normalizeRepositories(composer) {
+  if (!composer.repositories) {
+    return;
+  }
+
+  // If repositories is an object, convert to array
+  if (!Array.isArray(composer.repositories)) {
+    const repoArray = [];
+    for (const [key, value] of Object.entries(composer.repositories)) {
+      // Named repositories have the name in the object
+      if (typeof value === 'object') {
+        repoArray.push(value);
+      }
+    }
+    composer.repositories = repoArray;
+  }
+}
+
+/**
+ * Deduplicate repositories by URL
+ */
+function deduplicateRepositories(composer) {
+  if (!composer.repositories || !Array.isArray(composer.repositories)) {
+    return;
+  }
+
+  const seen = new Set();
+  composer.repositories = composer.repositories.filter(repo => {
+    if (!repo.url) {
+      return true; // Keep repos without URLs (like packagist)
+    }
+
+    const url = repo.url.replace(/\/$/, ''); // Remove trailing slash for comparison
+    if (seen.has(url)) {
+      return false; // Duplicate, remove it
+    }
+    seen.add(url);
+    return true;
+  });
+}
+
+/**
+ * Check if a repository URL already exists in composer.json
+ */
+function hasRepository(composer, url) {
+  if (!composer.repositories || !Array.isArray(composer.repositories)) {
+    return false;
+  }
+  const normalizedUrl = url.replace(/\/$/, '');
+  return composer.repositories.some(repo => {
+    if (!repo.url) return false;
+    return repo.url.replace(/\/$/, '') === normalizedUrl;
+  });
+}
+
+/**
+ * Sort an object's keys alphabetically (for require/require-dev sections)
+ */
+function sortObjectKeys(obj) {
+  if (!obj || typeof obj !== 'object') {
+    return obj;
+  }
+
+  const sorted = {};
+  Object.keys(obj).sort().forEach(key => {
+    sorted[key] = obj[key];
+  });
+  return sorted;
+}
+
+/**
+ * Get list of active Gravity Forms plugins using WP-CLI
+ * Returns array of plugin names or null if WP-CLI fails
+ */
+function getActiveGravityPlugins() {
+  try {
+    const url = process.env.DDEV_PRIMARY_URL || '';
+    const urlFlag = url ? `--url=${url}` : '';
+    const output = execSync(`wp plugin list --status=active --format=csv --fields=name ${urlFlag}`, {
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+
+    const plugins = output.trim().split('\n').slice(1); // Skip header row
+    return plugins.filter(plugin =>
+      plugin.includes('gravity') || plugin.includes('gravityforms')
+    );
+  } catch (error) {
+    return null; // WP-CLI not available or failed
+  }
+}
+
+/**
+ * Main execution
+ */
+function main() {
+  const composerPath = path.join(process.cwd(), 'composer.json');
+
+  if (!fs.existsSync(composerPath)) {
+    console.error('Error: composer.json not found in current directory');
+    process.exit(1);
+  }
+
+  // Read composer.json
+  let composer;
+  try {
+    const content = fs.readFileSync(composerPath, 'utf8');
+    composer = JSON.parse(content);
+  } catch (error) {
+    console.error(`Error reading composer.json: ${error.message}`);
+    process.exit(1);
+  }
+
+  // Normalize repositories (handle object format)
+  normalizeRepositories(composer);
+
+  // Run all migrations
+  let totalChanges = 0;
+
+  if (migrateKint(composer)) totalChanges++;
+  if (migrateTabrisrp(composer)) totalChanges++;
+  if (migrateAcfPro(composer)) totalChanges++;
+
+  const migratedGravityPackages = migrateGravityForms(composer);
+  if (migratedGravityPackages.length > 0) totalChanges++;
+
+  // Post-processing: deduplicate repositories and sort packages
+  if (totalChanges > 0) {
+    deduplicateRepositories(composer);
+
+    // Sort require and require-dev alphabetically (like composer does)
+    if (composer.require) {
+      composer.require = sortObjectKeys(composer.require);
+    }
+    if (composer['require-dev']) {
+      composer['require-dev'] = sortObjectKeys(composer['require-dev']);
+    }
+
+    if (dryRun) {
+      console.log(`${totalChanges} migration(s) would be applied. [DRY RUN]`);
+    } else {
+      try {
+        const content = JSON.stringify(composer, null, 4) + '\n';
+        fs.writeFileSync(composerPath, content, 'utf8');
+        console.log(`${totalChanges} migration(s) applied.`);
+      } catch (error) {
+        console.error(`Error writing composer.json: ${error.message}`);
+        process.exit(1);
+      }
+    }
+
+    // Warning for Gravity Forms plugin folder changes
+    if (migratedGravityPackages.length > 0) {
+      console.log('\n⚠️  WARNING: Gravity Forms packages have been migrated!');
+      console.log('\nMigrated packages:');
+      migratedGravityPackages.forEach(pkg => console.log(`  - ${pkg}`));
+
+      // Try to get currently active Gravity Forms plugins
+      const activePlugins = getActiveGravityPlugins();
+      if (activePlugins && activePlugins.length > 0) {
+        console.log('\nCurrently active Gravity Forms plugins:');
+        activePlugins.forEach(plugin => console.log(`  - ${plugin}`));
+        console.log('\n⚠️  These plugins may be deactivated after the migration!');
+      }
+
+      console.log('\nIMPORTANT: Plugin folder names will change after composer install.');
+      console.log('WordPress will DEACTIVATE these plugins after deployment, potentially breaking');
+      console.log('critical functionality in staging/production.');
+      console.log('\nDeployment checklist:');
+      console.log('  1. Deploy to STAGING first');
+      console.log('  2. Immediately log in to staging WordPress admin');
+      console.log('  3. Go to Plugins and reactivate any deactivated Gravity Forms plugins');
+      console.log('  4. Test functionality on staging');
+      console.log('  5. Deploy to production');
+      console.log('  6. Immediately log in to production WordPress admin and reactivate plugins');
+      console.log('  7. Verify critical forms are working in production');
+      if (!dryRun) {
+        console.log('');
+      }
+    }
+  }
+  // Silent when no changes needed
+}
+
+main();

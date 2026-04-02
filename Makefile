@@ -27,23 +27,26 @@ build-production:
 
 start: ## Turn on ddev
 	@if ! docker info >/dev/null 2>&1; then \
-		if command -v colima >/dev/null 2>&1; then \
-		  colima start; \
+		if command -v orbctl >/dev/null 2>&1; then \
+		  orbctl app start >/dev/null 2>&1 || orbctl start >/dev/null 2>&1 || true; \
+		elif command -v open >/dev/null 2>&1; then \
+		  open -ga OrbStack >/dev/null 2>&1; \
 		else \
-			echo "Docker doesn't appear to be running"; \
+			echo "Docker doesn't appear to be running (tried to launch OrbStack)"; \
 			exit 1; \
 		fi; \
   	fi
   		 
 	@if ! make running 2>/dev/null; then \
-		if ddev list | grep -qi ok; then \
-		  ddev poweroff; \
-		fi; \
 		make self-update; \
 		ddev start && ddev auth ssh && ddev composer-auth && make status; \
+		ddev post-start; \
 	fi
 	
 stop: ## Shut down ddev
+	-@ddev stop
+
+poweroff: ## Shut down all ddev sites
 	-@ddev poweroff
 
 restart: stop start ## Restart ddev
@@ -55,6 +58,12 @@ container-sync:
 watch: ## Start the watch task
 	@ddev yarn-watch
 	
+lint: ## Lint source files
+	@ddev yarn-lint
+
+format: ## Format source files
+	@ddev yarn-lint
+
 logging: ## Tail the ddev log
 	@ddev log-tail
 
@@ -75,6 +84,9 @@ update-review: ## Full reset and update process with manual comparison against a
 
 self-update: ## Update Situation ddev config from remote repository. Branch is defined by $UPDATE_BRANCH.
 	@[ -z ${UPDATE_BRANCH} ] || /bin/bash -c "$$(curl -fsSL https://raw.githubusercontent.com/sitdev/ddev/main/install.sh)" -- "${UPDATE_BRANCH}" 
+
+node20-upgrade:
+	@/bin/bash -c "$$(curl -fsSL https://raw.githubusercontent.com/sitdev/ddev/main/bin/node20-upgrade.sh)"
 
 local-init: start ## Initialize local WP database using basic defaults
 	@ddev composer-install

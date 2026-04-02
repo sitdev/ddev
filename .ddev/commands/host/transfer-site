@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+
+## Description: Stage or manage the site staging environment for remote server transfer
+## Usage: transfer-site [flags]
+## Example: ddev transfer-site\nddev transfer-site --form-entries\nddev transfer-site --reset
+## OSTypes: darwin
+## Flags: [{"Name":"form-entries","Usage":"Populate the transfer staging with the latest form entries"},{"Name":"reset","Usage":"Reset the transfer environment after transfer is complete"}]
+
+check_command_existence() {
+  command -v "$1" &>/dev/null
+}
+
+[[ "$(uname)" != "Darwin" ]] && exit
+
+temporary_directory=$(mktemp -d)
+cleanup_temporary_directory() { rm -rf "$temporary_directory"; }
+trap cleanup_temporary_directory EXIT INT TERM
+
+git clone git@github.com:sitdev/workflow-support.git "$temporary_directory" &>/dev/null || exit
+
+check_command_existence sshpass || { brew tap esolitos/ipa && brew install esolitos/ipa/sshpass &>/dev/null; }
+for arg in "$@"; do
+    case $arg in
+        --form-entries)
+            bash "${temporary_directory}/bin/transfer-site/form-entries.sh"
+            exit
+            ;;
+        --reset)
+            bash "${temporary_directory}/bin/transfer-site/reset-staging.sh"
+            exit
+            ;;
+    esac
+done
+
+bash "${temporary_directory}/bin/transfer-site/main.sh"
+
+cleanup_temporary_directory

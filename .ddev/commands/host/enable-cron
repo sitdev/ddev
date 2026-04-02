@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+
+## Description: Enable server-side WP cron for testing cron-dependent features.
+## Usage: enable-cron
+## Example: ddev enable-cron
+
+LOCAL_CONFIG="${DDEV_APPROOT}/${DDEV_DOCROOT}/local-config.php"
+PRIMARY_URL="https://${DDEV_SITENAME}.${DDEV_TLD}"
+
+# --- State detection ---
+# If markers already exist in local-config.php, only infrastructure needs reinstalling.
+if [ -f "$LOCAL_CONFIG" ] && grep -q '// \[ddev:cron\]' "$LOCAL_CONFIG"; then
+  echo "Cron config already present in local-config.php. Re-installing infrastructure..."
+  ddev add-on get ddev/ddev-cron
+  mkdir -p "${DDEV_APPROOT}/.ddev/web-build"
+  cat <<EOT > "${DDEV_APPROOT}/.ddev/web-build/wp.cron"
+* * * * * cd /var/www/html && /usr/local/bin/wp cron event run --due-now --url=${PRIMARY_URL} >> cron.log 2>&1
+EOT
+  ddev restart
+  echo ""
+  echo "Server-side cron re-enabled."
+  exit 0
+fi
+
+# --- Full setup ---
+
+# 1. Install ddev-cron add-on
+ddev add-on get ddev/ddev-cron
+
+# 2. Write the WP cron job
+mkdir -p "${DDEV_APPROOT}/.ddev/web-build"
+cat <<EOT > "${DDEV_APPROOT}/.ddev/web-build/wp.cron"
+* * * * * cd /var/www/html && /usr/local/bin/wp cron event run --due-now --url=${PRIMARY_URL} >> cron.log 2>&1
+EOT
+
+# 3. Add cron config block to local-config.php
+if [ ! -f "$LOCAL_CONFIG" ]; then
+  echo "Error: local-config.php not found. Run 'make' first to initialize the project."
+  exit 1
+fi
+
+cat <<'EOT' >> "$LOCAL_CONFIG"
+// [ddev:cron]
+const DISABLE_WP_CRON = true;
+const SITCHCO_LOG_FILE = true;
+// [/ddev:cron]
+EOT
+
+# 4. Restart to rebuild web image with cron
+ddev restart
+
+# 5. Post-enable guidance
+echo ""
+echo "Server-side cron enabled. WP cron events will run every minute."
+echo ""
+echo "Useful commands:"
+echo "  ddev wp cron event list                    # List scheduled events"
+echo "  ddev wp cron event run --due-now           # Manually fire due events"
+echo "  tail -f wp-content/uploads/logs/\$(date +%Y-%m-%d).log  # Watch debug log"
+echo ""
+echo "To disable: run 'make restart' to rebuild the default environment."

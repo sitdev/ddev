@@ -41,10 +41,18 @@ buildYarn() {
   [ ! -z $SOFT_RESET ] && installYarn
   if [ -f package.json ]; then
     if [ -f webpack.config.js ]; then
-      [ -z "${isProduction}" ] && yarn develop || yarn production
+      if [ -z "${isProduction}" ]; then
+        yarn develop
+      else
+        yarn production
+      fi
     fi
     if [ -f gulpfile.js ]; then
-      [ -z "${isProduction}" ] && yarn gulp || yarn gulp --production
+        if [ -z "${isProduction}" ]; then
+          yarn gulp
+        else
+          yarn gulp --production
+        fi
     fi
   fi
 }
