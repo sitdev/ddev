@@ -2,5 +2,11 @@
 
 ## Description: Composer install
 
-[ -f .ddev/.plugin-dev-mode ] && flag="--prefer-source" || true
-ddev composer install -o $flag
+if [ -f .ddev/.plugin-dev-mode ]; then
+    ddev composer config 'preferred-install.sitchco/*' source
+    ddev composer config 'preferred-install.situation/*' source
+    ddev composer config 'preferred-install.kadencewp/kadence-blocks' source
+    ddev composer config 'preferred-install.*' dist
+    trap 'ddev composer config --unset preferred-install' EXIT
+fi
+ddev composer install -o
