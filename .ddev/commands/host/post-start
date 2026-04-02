@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+
+## Description: Post-start checks and maintenance
+
+source .conf/.env
+
+# One-time architecture migration (node20 + x86)
+check_architecture() {
+  if [[ "$NODE_VER" == "20" ]]; then
+    if ddev exec "uname -m" | grep -q "x86"; then
+      ddev export-db --file=./db-backup.sql.gz
+      ddev delete -Oy
+      make start
+      ddev import-db --file=./db-backup.sql.gz
+      rm -f ./db-backup.sql.gz
+    fi
+  fi
+}
+
+# Warn if too many DDEV sites are running
+check_running_sites() {
+  local running_count
+  running_count=$(ddev list | grep -ci "ok")
+  if [[ "$running_count" -gt 3 ]]; then
+    echo ""
+    echo "Warning: ${running_count} DDEV sites are currently running."
+    echo ""
+    ddev list
+    echo ""
+    read -r -p "Stop all other sites and restart this one? (y/N) " response
+    if [[ "$response" =~ ^[Yy]$ ]]; then
+      ddev poweroff
+      ddev start
+    fi
+  fi
+}
+
+check_architecture
+check_running_sites

@@ -38,15 +38,15 @@ start: ## Turn on ddev
   	fi
   		 
 	@if ! make running 2>/dev/null; then \
-		if ddev list | grep -qi ok; then \
-		  ddev poweroff; \
-		fi; \
 		make self-update; \
 		ddev start && ddev auth ssh && ddev composer-auth && make status; \
+		ddev post-start; \
 	fi
-	@ddev validate-architecture
 	
 stop: ## Shut down ddev
+	-@ddev stop
+
+poweroff: ## Shut down all ddev sites
 	-@ddev poweroff
 
 restart: stop start ## Restart ddev
