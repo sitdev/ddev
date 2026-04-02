@@ -36,6 +36,11 @@ const ACF_PRO_REPO = {
   url: 'https://connect.advancedcustomfields.com'
 };
 
+const YOAST_REPO = {
+  type: 'composer',
+  url: 'https://my.yoast.com/packages/'
+};
+
 const dryRun = process.argv.includes('--dry-run');
 
 /**
@@ -99,6 +104,29 @@ function migrateAcfPro(composer) {
     if (!hasRepository(composer, ACF_PRO_REPO.url)) {
       composer.repositories = composer.repositories || [];
       composer.repositories.push(ACF_PRO_REPO);
+    }
+  }
+
+  return changed;
+}
+
+/**
+ * Migrate Yoast SEO Premium from situation to official yoast repo
+ */
+function migrateYoast(composer) {
+  let changed = false;
+
+  const oldPackage = 'situation/wordpress-seo-premium';
+  const newPackage = 'yoast/wordpress-seo-premium';
+
+  if (composer.require && composer.require[oldPackage]) {
+    delete composer.require[oldPackage];
+    composer.require[newPackage] = '*';
+    changed = true;
+
+    if (!hasRepository(composer, YOAST_REPO.url)) {
+      composer.repositories = composer.repositories || [];
+      composer.repositories.push(YOAST_REPO);
     }
   }
 
@@ -259,6 +287,7 @@ function main() {
   if (migrateKint(composer)) totalChanges++;
   if (migrateTabrisrp(composer)) totalChanges++;
   if (migrateAcfPro(composer)) totalChanges++;
+  if (migrateYoast(composer)) totalChanges++;
 
   const migratedGravityPackages = migrateGravityForms(composer);
   if (migratedGravityPackages.length > 0) totalChanges++;
