@@ -51,6 +51,13 @@ if [ "$#" -gt 0 ]; then
             break
         fi
     done
+
+    # If argument was provided but not found, exit with error
+    if [ -z "$selected_profile" ]; then
+        echo "Error: Profile '$1' not found" >&2
+        echo "Available profiles: ${deployment_profiles[*]}" >&2
+        exit 1
+    fi
 fi
 
 # Displaying deployment profiles and handling user input if no valid argument was provided
@@ -79,7 +86,10 @@ selected_directory="$repository_config_directory/$selected_profile"
 [[ -f "$selected_directory/build.txt" ]] || exit
 
 # Reading required variables from build.txt
-eval $(grep "^export.*\(HOST\|USER\|PASS\|WEBROOT\)" "$selected_directory/build.txt")
+eval $(grep -m1 "^export.*HOST" "$selected_directory/build.txt")
+eval $(grep -m1 "^export.*USER" "$selected_directory/build.txt")
+eval $(grep -m1 "^export.*PASS" "$selected_directory/build.txt")
+eval $(grep -m1 "^export.*WEBROOT" "$selected_directory/build.txt")
 
 # Validate SSH connection
 validate_ssh_connection "$temporary_directory" "${USER}@${HOST}" || exit
