@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+## Description: Deprecated - use post-start instead
+
+ddev post-start

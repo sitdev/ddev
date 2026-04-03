@@ -44,6 +44,38 @@ const YOAST_REPO = {
 const dryRun = process.argv.includes('--dry-run');
 
 /**
+ * Add composer/installers alias when wp-sync-db pins it to ~1.0.6
+ *
+ * wp-sync-db requires composer/installers ~1.0.6, which pins it to 1.0.x.
+ * This prevents packages like Yoast SEO Premium from resolving to modern
+ * versions that need composer/installers ^1.12 || ^2.0.
+ */
+function migrateComposerInstallers(composer) {
+  const syncDbPackages = [
+    'wp-sync-db/wp-sync-db',
+    'wp-sync-db/wp-sync-db-cli'
+  ];
+
+  const hasSyncDb = syncDbPackages.some(pkg =>
+    (composer.require && composer.require[pkg]) ||
+    (composer['require-dev'] && composer['require-dev'][pkg])
+  );
+
+  if (!hasSyncDb) {
+    return false;
+  }
+
+  // Already has the alias or an explicit require
+  if (composer.require && composer.require['composer/installers']) {
+    return false;
+  }
+
+  composer.require = composer.require || {};
+  composer.require['composer/installers'] = '1.12.0 as 1.0.21';
+  return true;
+}
+
+/**
  * Migrate kint-php from version 2.0 to latest
  */
 function migrateKint(composer) {
@@ -284,6 +316,7 @@ function main() {
   // Run all migrations
   let totalChanges = 0;
 
+  if (migrateComposerInstallers(composer)) totalChanges++;
   if (migrateKint(composer)) totalChanges++;
   if (migrateTabrisrp(composer)) totalChanges++;
   if (migrateAcfPro(composer)) totalChanges++;
