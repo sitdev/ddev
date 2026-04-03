@@ -23,15 +23,10 @@ check_running_sites() {
   running_count=$(ddev list | grep -ci "ok")
   if [[ "$running_count" -gt 3 ]]; then
     echo ""
-    echo "Warning: ${running_count} DDEV sites are currently running."
+    echo "Warning: ${running_count} DDEV sites are currently running. Consider 'make poweroff && make start' to limit resource consumption."
     echo ""
     ddev list
     echo ""
-    read -r -p "Stop all other sites and restart this one? (y/N) " response
-    if [[ "$response" =~ ^[Yy]$ ]]; then
-      ddev poweroff
-      ddev start
-    fi
   fi
 }
 
