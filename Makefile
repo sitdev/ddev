@@ -146,7 +146,7 @@ xdebug: ## Toggle Xdebug (off by default)
 	@ddev toggle-xdebug
 
 running:
-	@ddev exec pwd >/dev/null 2>&1 || exit 1
+	@ddev describe 2>/dev/null | grep -q "Status: *OK\|Status: *running"
 
 remove-project: ## Remove project from DDEV project list. Local db is deleted, files are not
 	-@ddev delete -O
