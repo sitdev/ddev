@@ -79,6 +79,13 @@ function migrateWpMigrateDbPro(composer) {
     return false;
   }
 
+  for (const relPath of ['.conf/migrations', '.conf/connections.yaml']) {
+    const fullPath = path.join(process.cwd(), relPath);
+    if (fs.existsSync(fullPath) && !dryRun) {
+      fs.rmSync(fullPath, { recursive: true, force: true });
+    }
+  }
+
   // The composer/installers alias was only there to satisfy wp-sync-db's
   // ~1.0.6 pin. With wp-sync-db gone, let transitive resolution handle it.
   if (composer.require && composer.require['composer/installers']) {
