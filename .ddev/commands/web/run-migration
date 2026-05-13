@@ -1,46 +1,172 @@
 #!/usr/bin/env bash
 
-## Description: Run a previously saved WP Sync DB migration profile.
-## Usage: run-migration [args]
-## Example: "ddev run-migration pull-staging"
+## Description: Run a WP Migrate Pro environment pull from connections.json
+## Usage: run-migration <branch> [--skip-media]
+## Example: "ddev run-migration develop" or "ddev run-migration master --skip-media"
 
-if [ -z $1 ]; then
-  wp wpsdb migrate --help --url=${DDEV_PRIMARY_URL}
-  ls .conf/migrations | sed -e 's/\.yaml//'
-  exit
+set -euo pipefail
+
+# Configuration
+CONNECTIONS_FILE=".conf/migrations/connections.json"
+BRANCH=""
+SKIP_MEDIA=false
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --skip-media)
+      SKIP_MEDIA=true
+      shift
+      ;;
+    --help|-h)
+      echo "Usage: ddev run-migration <branch> [--skip-media]"
+      echo ""
+      echo "Pull database (and optionally media) from a remote environment using WP Migrate Pro."
+      echo ""
+      echo "Arguments:"
+      echo "  <branch>       Branch name (key in connections.json, e.g., 'develop', 'master')"
+      echo ""
+      echo "Options:"
+      echo "  --skip-media   Skip media sync entirely (database only)"
+      echo ""
+      echo "Examples:"
+      echo "  ddev run-migration develop           # Pull develop with automatic media handling"
+      echo "  ddev run-migration master --skip-media  # Pull master database only"
+      exit 0
+      ;;
+    -*)
+      echo "Error: Unknown option: $1" >&2
+      exit 1
+      ;;
+    *)
+      if [ -z "$BRANCH" ]; then
+        BRANCH="$1"
+      else
+        echo "Error: Too many arguments. Expected branch name only." >&2
+        exit 1
+      fi
+      shift
+      ;;
+  esac
+done
+
+# Validate branch argument
+if [ -z "$BRANCH" ]; then
+  echo "Error: Branch name is required." >&2
+  echo "" >&2
+  echo "Usage: ddev run-migration <branch> [--skip-media]" >&2
+  echo "" >&2
+  if [ -f "$CONNECTIONS_FILE" ]; then
+    echo "Available connections:" >&2
+    jq -r 'keys[]' "$CONNECTIONS_FILE" 2>/dev/null || echo "  (none configured)" >&2
+  else
+    echo "No connections configured yet. Run 'ddev migration' to add connections." >&2
+  fi
+  exit 1
 fi
 
-FILE=".conf/migrations/${1}.yaml"
+# Check if connections file exists and has the requested connection
+connection_missing=false
 
-if [ -f ${FILE} ]; then
-  echo "Importing migration from ${FILE}"
-  direction=$(yq '.profiles[0].action' "${FILE}")
-  if [[ "${direction}" = "push" ]]; then
-    dialog --erase-on-exit --title "Confirm Remote Database Overwrite" --backtitle "Warning:" --yesno "This action will push the local database and overwrite a remote database. Are you sure?" 8 70
-    confirm=$?
-    if [ ! "$confirm" -eq 0 ]; then
-      exit
-    fi
+if [ ! -f "$CONNECTIONS_FILE" ]; then
+  connection_missing=true
+elif ! jq -e ".\"$BRANCH\"" "$CONNECTIONS_FILE" >/dev/null 2>&1; then
+  connection_missing=true
+fi
+
+# If connection is missing, launch interactive menu
+if [ "$connection_missing" = true ]; then
+  echo "" >&2
+  echo "Connection '$BRANCH' not found." >&2
+
+  if [ -f "$CONNECTIONS_FILE" ] && [ "$(jq 'keys | length' "$CONNECTIONS_FILE" 2>/dev/null)" -gt 0 ]; then
+    echo "Available connections: $(jq -r 'keys | join(", ")' "$CONNECTIONS_FILE")" >&2
+  else
+    echo "No connections configured yet." >&2
   fi
-  option=$(yq -o=json "${FILE}")
-  wp option update wpsdb_settings "${option}" --format=json --url=${DDEV_PRIMARY_URL}
-  wp plugin is-installed wp-sync-db-cli --url=${DDEV_PRIMARY_URL} >/dev/null 2>&1 || composer require wp-sync-db/wp-sync-db-cli:dev-master --dev
-  wp plugin is-active wp-sync-db-cli --url=${DDEV_PRIMARY_URL} >/dev/null 2>&1 || wp plugin activate wp-sync-db-cli --url=${DDEV_PRIMARY_URL}
-  if ! grep -q situation/wp-sync-db-media-files composer.json; then
-    composer remove wp-sync-db/wp-sync-db-media-files >/dev/null 2>&1
-    composer require situation/wp-sync-db-media-files:dev-master -o >/dev/null 2>&1
-    composer update situation/backstage >/dev/null 2>&1
+
+  echo "" >&2
+  echo "Launching interactive migration menu..." >&2
+  echo "" >&2
+
+  exec bash .ddev/commands/web/migration
+fi
+
+REMOTE_URL=$(jq -r ".\"$BRANCH\".url" "$CONNECTIONS_FILE")
+SECRET_KEY=$(jq -r ".\"$BRANCH\".secret" "$CONNECTIONS_FILE")
+LABEL=$(jq -r ".\"$BRANCH\".label // \"$BRANCH\"" "$CONNECTIONS_FILE")
+
+echo "=================================================="
+echo "WP Migrate Pro: Pulling from $LABEL"
+echo "=================================================="
+echo "Branch: $BRANCH"
+echo "Remote: $REMOTE_URL"
+echo ""
+
+# Handle media synchronization
+if [ "$SKIP_MEDIA" = true ]; then
+  echo "Media: Skipping (--skip-media flag)"
+  INCLUDE_MEDIA="no"
+else
+  echo "Media: Will be synced via WP Migrate Pro"
+  INCLUDE_MEDIA="yes"
+fi
+
+echo ""
+echo "Pulling database..."
+
+# Build WP Migrate Pro pull command with positional arguments
+WP_MIGRATE_CMD="wp migrate pull \"$REMOTE_URL\" \"$SECRET_KEY\""
+
+# Add URL flag
+WP_MIGRATE_CMD="$WP_MIGRATE_CMD --url=${DDEV_PRIMARY_URL}"
+
+# Handle media: explicitly include or exclude
+if [ "$INCLUDE_MEDIA" = "yes" ]; then
+  WP_MIGRATE_CMD="$WP_MIGRATE_CMD --media=all"
+else
+  # Use exclude-media with wildcard to exclude all media files
+  WP_MIGRATE_CMD="$WP_MIGRATE_CMD --exclude-media=\"*\""
+fi
+
+# Execute the pull
+if eval "$WP_MIGRATE_CMD"; then
+  echo ""
+  echo "Database pull completed successfully."
+else
+  echo "" >&2
+  echo "Error: Database pull failed." >&2
+  exit 1
+fi
+
+# Post-migration cleanup
+echo ""
+echo "Running post-migration cleanup..."
+
+# Deactivate cache plugins that cause issues in local development
+for plugin in wp-rocket redis-cache w3-total-cache; do
+  if wp plugin is-active "$plugin" --url=${DDEV_PRIMARY_URL} >/dev/null 2>&1; then
+    echo "  - Deactivating $plugin"
+    wp plugin deactivate "$plugin" --url=${DDEV_PRIMARY_URL} >/dev/null 2>&1 || true
   fi
-  migrationName=$(yq '.profiles[0].name' "${FILE}")
-  echo "Running Migration: ${migrationName}"
-  wp wpsdb migrate 1 --url=${DDEV_PRIMARY_URL}
-  if [[ "${direction}" = "pull" ]]; then
-    wp plugin deactivate wp-rocket --url=${DDEV_PRIMARY_URL} >/dev/null 2>&1 || true
-    wp plugin deactivate redis-cache --url=${DDEV_PRIMARY_URL} >/dev/null 2>&1 || true
+done
+
+# Restore wp-config.php from git to prevent committing production config
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  if git diff --quiet wp-config.php 2>/dev/null || [ -z "$(git status --porcelain wp-config.php 2>/dev/null)" ]; then
+    : # wp-config.php is unchanged, nothing to restore
+  else
+    echo "  - Restoring wp-config.php from git"
     git restore --staged wp-config.php >/dev/null 2>&1 || true
     git restore wp-config.php >/dev/null 2>&1 || true
   fi
-else
-  echo "Migration ${1} not found."
-  echo "Delete existing migrations in the CMS, set up the new one, and run ddev export-migration."
 fi
+
+# Flush WordPress cache
+echo "  - Flushing WordPress cache"
+wp cache flush --url=${DDEV_PRIMARY_URL} >/dev/null 2>&1 || true
+
+echo ""
+echo "=================================================="
+echo "Migration completed successfully!"
+echo "=================================================="
