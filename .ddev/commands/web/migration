@@ -23,25 +23,29 @@ has_gum() {
   command -v gum >/dev/null 2>&1
 }
 
-# Safe prompt function with fallback
+# Safe prompt function with fallback. On cancel (Esc), returns empty string
+# without aborting under `set -e`.
 prompt_input() {
   local prompt_text="$1"
   local placeholder="${2:-}"
   local result=""
 
   if has_gum; then
+    local gum_args=(--prompt "$prompt_text ")
     if [ -n "$placeholder" ]; then
-      result=$(gum input --placeholder "$placeholder" --prompt "$prompt_text ")
-      # If empty and placeholder provided, use placeholder as default
-      if [ -z "$result" ]; then
+      gum_args+=(--placeholder "$placeholder")
+    fi
+    if result=$(gum input "${gum_args[@]}"); then
+      # User submitted; apply placeholder as default when empty
+      if [ -z "$result" ] && [ -n "$placeholder" ]; then
         result="$placeholder"
       fi
     else
-      result=$(gum input --prompt "$prompt_text ")
+      # User cancelled — leave result empty so callers can detect it
+      result=""
     fi
   else
     read -p "$prompt_text " result
-    # If empty and placeholder provided, use placeholder as default
     if [ -z "$result" ] && [ -n "$placeholder" ]; then
       result="$placeholder"
     fi
@@ -63,14 +67,16 @@ prompt_confirm() {
   fi
 }
 
-# Safe choose function with fallback
+# Safe choose function with fallback. On cancel (Esc), prints nothing and
+# returns success so callers can treat empty output as "back / cancelled"
+# without tripping `set -e`.
 prompt_choose() {
   local prompt_text="$1"
   shift
   local options=("$@")
 
   if has_gum; then
-    gum choose --header "$prompt_text" "${options[@]}"
+    gum choose --header "$prompt_text" "${options[@]}" || true
   else
     echo "$prompt_text" >&2
     local i=1
@@ -81,8 +87,6 @@ prompt_choose() {
     read -p "Enter choice (1-${#options[@]}): " choice
     if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#options[@]}" ]; then
       echo "${options[$((choice-1))]}"
-    else
-      return 1
     fi
   fi
 }
@@ -155,35 +159,20 @@ add_connection() {
   # Check if connection already exists
   if jq -e ".\"$branch\"" "$CONNECTIONS_FILE" >/dev/null 2>&1; then
     echo ""
-    echo "Warning: Connection '$branch' already exists."
-    if ! prompt_confirm "Overwrite existing connection?"; then
+    if ! prompt_confirm "Connection '$branch' already exists. Overwrite?"; then
       echo "Cancelled."
       return
     fi
   fi
 
-  # Optional label
-  label=$(prompt_input "Display label (optional):" "$branch")
-  if [ -z "$label" ]; then
-    label="$branch"
-  fi
-
-  # Optional description
-  description=$(prompt_input "Description (optional):" "")
-
-  # Build JSON object
+  # Build JSON object. Label defaults to branch; description is omitted by
+  # default and can be added via hand-edit of connections.json.
   local connection_obj
   connection_obj=$(jq -n \
     --arg url "$url" \
     --arg secret "$secret" \
-    --arg lbl "$label" \
-    --arg desc_text "$description" \
-    '{url: ($url), secret: ($secret), label: ($lbl), description: ($desc_text)}')
-
-  # Remove description field if empty
-  if [ -z "$description" ]; then
-    connection_obj=$(echo "$connection_obj" | jq 'del(.description)')
-  fi
+    --arg lbl "$branch" \
+    '{url: ($url), secret: ($secret), label: ($lbl)}')
 
   # Update connections file
   jq ".\"$branch\" = $connection_obj" "$CONNECTIONS_FILE" > "${CONNECTIONS_FILE}.tmp"
@@ -211,22 +200,33 @@ list_connections() {
     return
   fi
 
-  jq -r 'to_entries[] | "  [\(.key)] \(.value.label // .key)\n    URL: \(.value.url)\n    Description: \(.value.description // "(none)")\n"' "$CONNECTIONS_FILE"
+  jq -r 'to_entries[] | "  [\(.key)] \(.value.label // .key)\n    URL: \(.value.url)" + (if .value.description then "\n    Description: \(.value.description)" else "" end) + "\n"' "$CONNECTIONS_FILE"
 
   echo ""
 }
 
-# Pull from a connection
+# Pull from a connection. If $1 is provided, skip the picker; otherwise show
+# the legacy picker as a fallback.
 pull_connection() {
   ensure_connections_file
+  local branch="${1:-}"
 
-  # Check if any connections exist
-  if [ "$(jq 'length' "$CONNECTIONS_FILE")" -eq 0 ]; then
-    echo ""
-    echo "No connections configured yet."
-    echo "Please add a connection first."
-    echo ""
-    return
+  if [ -z "$branch" ]; then
+    if [ "$(jq 'length' "$CONNECTIONS_FILE")" -eq 0 ]; then
+      echo ""
+      echo "No connections configured yet."
+      echo "Please add a connection first."
+      echo ""
+      return
+    fi
+
+    mapfile -t labels < <(jq -r 'to_entries[] | "\(.key): \(.value.label // .key)"' "$CONNECTIONS_FILE")
+    selected=$(prompt_choose "Select connection:" "${labels[@]}")
+    if [ -z "$selected" ]; then
+      echo "Cancelled."
+      return
+    fi
+    branch=$(echo "$selected" | cut -d: -f1)
   fi
 
   echo ""
@@ -235,45 +235,27 @@ pull_connection() {
   echo "=================================================="
   echo ""
 
-  # Get list of connections
-  mapfile -t branches < <(jq -r 'keys[]' "$CONNECTIONS_FILE")
-  mapfile -t labels < <(jq -r 'to_entries[] | "\(.key): \(.value.label // .key)"' "$CONNECTIONS_FILE")
-
-  # Choose connection
-  selected=$(prompt_choose "Select connection:" "${labels[@]}")
-  if [ -z "$selected" ]; then
-    echo "Cancelled."
-    return
-  fi
-
-  # Extract branch from selection
-  branch=$(echo "$selected" | cut -d: -f1)
-
-  echo ""
-  if ! prompt_confirm "Pull database from '$branch' (will overwrite local database)?"; then
-    echo "Cancelled."
-    return
-  fi
-
   # Choose media handling strategy
   echo ""
   echo "Note: For faster media sync via rsync, use 'make pull-staging' or 'make pull-production'"
   echo ""
   media_strategy=$(prompt_choose "How should media be handled?" \
     "Include media (synced via WP Migrate Pro)" \
-    "Skip media (database only)")
+    "Skip media (database only)" \
+    "← Back to main menu")
 
   local migration_result=0
   case "$media_strategy" in
     "Include"*)
-      # Include media via WP Migrate Pro
       bash .ddev/commands/web/run-migration "$branch"
       migration_result=$?
       ;;
     "Skip"*)
-      # Skip media entirely
       bash .ddev/commands/web/run-migration "$branch" --skip-media
       migration_result=$?
+      ;;
+    "←"*|"")
+      return
       ;;
     *)
       echo "Invalid selection"
@@ -313,8 +295,6 @@ push_connection() {
   echo "Push to Remote"
   echo "=================================================="
   echo ""
-  echo "⚠️  WARNING: This will OVERWRITE the remote database!"
-  echo ""
 
   # Get list of connections (excluding production)
   mapfile -t branches < <(jq -r 'keys[] | select(. != "master" and . != "production")' "$CONNECTIONS_FILE")
@@ -327,11 +307,11 @@ push_connection() {
   fi
 
   mapfile -t labels < <(jq -r 'to_entries[] | select(.key != "master" and .key != "production") | "\(.key): \(.value.label // .key)"' "$CONNECTIONS_FILE")
+  labels+=("← Back to main menu")
 
   # Choose connection
   selected=$(prompt_choose "Select connection:" "${labels[@]}")
-  if [ -z "$selected" ]; then
-    echo "Cancelled."
+  if [ -z "$selected" ] || [[ "$selected" == "←"* ]]; then
     return
   fi
 
@@ -339,12 +319,7 @@ push_connection() {
   branch=$(echo "$selected" | cut -d: -f1)
 
   echo ""
-  echo "⚠️  FINAL WARNING ⚠️"
-  echo "This will push your LOCAL database to:"
-  echo "  Branch: $branch"
-  echo ""
-
-  if ! prompt_confirm "Are you absolutely sure you want to continue?"; then
+  if ! prompt_confirm "⚠️  This will OVERWRITE the '$branch' remote database. Continue?"; then
     echo "Cancelled. No changes made."
     return
   fi
@@ -373,9 +348,30 @@ push_connection() {
   fi
 }
 
-# Main menu loop
+# Ensure wp-migrate-db-pro is installed and active; the `wp migrate` subcommand
+# is only registered when the plugin is active. Run before the menu to fail
+# fast rather than midway through an interactive flow.
+ensure_migrate_plugin_ready() {
+  if ! wp plugin is-installed wp-migrate-db-pro --url=${DDEV_PRIMARY_URL} >/dev/null 2>&1; then
+    echo ""
+    echo "✗ Error: wp-migrate-db-pro is not installed."
+    echo ""
+    echo "  Run 'make' or 'ddev composer install' from the project root to install"
+    echo "  Composer dependencies, then try again."
+    echo ""
+    exit 1
+  fi
+  if ! wp plugin is-active wp-migrate-db-pro --url=${DDEV_PRIMARY_URL} >/dev/null 2>&1; then
+    echo "Activating wp-migrate-db-pro plugin..."
+    wp plugin activate wp-migrate-db-pro --url=${DDEV_PRIMARY_URL} >/dev/null
+  fi
+}
+
+# Main menu loop. Pull targets are listed directly so the common case is one
+# selection instead of two; push stays nested under a submenu.
 main_menu() {
   ensure_connections_file
+  ensure_migrate_plugin_ready
 
   while true; do
     clear
@@ -384,36 +380,53 @@ main_menu() {
     echo "=================================================="
     echo ""
 
-    action=$(prompt_choose "What would you like to do?" \
-      "Pull from remote" \
-      "Push to remote" \
-      "Add connection" \
-      "List connections" \
-      "Exit")
+    local -a menu=()
+    local -a actions=()
 
-    case "$action" in
-      "Pull"*)
-        pull_connection
-        ;;
-      "Push"*)
-        push_connection
-        ;;
-      "Add"*)
-        add_connection
-        ;;
-      "List"*)
-        list_connections
-        read -p "Press Enter to continue..."
-        ;;
-      "Exit")
-        echo ""
-        echo "Goodbye!"
-        exit 0
-        ;;
-      *)
-        echo "Invalid selection"
-        sleep 1
-        ;;
+    while IFS=$'\t' read -r key label; do
+      [ -z "$key" ] && continue
+      menu+=("Pull from $label")
+      actions+=("pull"$'\t'"$key")
+    done < <(jq -r 'to_entries[] | "\(.key)\t\(.value.label // .key)"' "$CONNECTIONS_FILE")
+
+    local non_prod_count
+    non_prod_count=$(jq '[to_entries[] | select(.key != "master" and .key != "production")] | length' "$CONNECTIONS_FILE")
+    if [ "$non_prod_count" -gt 0 ]; then
+      menu+=("Push to remote ›")
+      actions+=("push"$'\t')
+    fi
+
+    menu+=("Add connection")
+    actions+=("add"$'\t')
+    menu+=("List connections")
+    actions+=("list"$'\t')
+    menu+=("Exit")
+    actions+=("exit"$'\t')
+
+    action=$(prompt_choose "What would you like to do?" "${menu[@]}")
+
+    local idx=-1
+    for i in "${!menu[@]}"; do
+      if [ "${menu[$i]}" = "$action" ]; then
+        idx=$i
+        break
+      fi
+    done
+    if [ "$idx" -lt 0 ]; then
+      echo "Invalid selection"
+      sleep 1
+      continue
+    fi
+
+    local cmd="${actions[$idx]%%$'\t'*}"
+    local branch="${actions[$idx]#*$'\t'}"
+
+    case "$cmd" in
+      pull) pull_connection "$branch" ;;
+      push) push_connection ;;
+      add)  add_connection ;;
+      list) list_connections; read -p "Press Enter to continue..." ;;
+      exit) echo ""; echo "Goodbye!"; exit 0 ;;
     esac
   done
 }
