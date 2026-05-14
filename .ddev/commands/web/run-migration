@@ -113,6 +113,18 @@ else
 fi
 
 echo ""
+
+# Ensure wp-migrate-db-pro is active; the `wp migrate` subcommand is only
+# registered when the plugin is active.
+if ! wp plugin is-installed wp-migrate-db-pro --url=${DDEV_PRIMARY_URL} >/dev/null 2>&1; then
+  echo "Error: wp-migrate-db-pro plugin is not installed." >&2
+  exit 1
+fi
+if ! wp plugin is-active wp-migrate-db-pro --url=${DDEV_PRIMARY_URL} >/dev/null 2>&1; then
+  echo "Activating wp-migrate-db-pro plugin..."
+  wp plugin activate wp-migrate-db-pro --url=${DDEV_PRIMARY_URL} >/dev/null
+fi
+
 echo "Pulling database..."
 
 # Build WP Migrate Pro pull command with positional arguments
