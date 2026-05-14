@@ -41,7 +41,70 @@ const YOAST_REPO = {
   url: 'https://my.yoast.com/packages/'
 };
 
+const WP_MIGRATE_DB_PRO_REPO = {
+  type: 'composer',
+  url: 'https://composer.deliciousbrains.com'
+};
+
+const WP_SYNC_DB_PACKAGES = [
+  'wp-sync-db/wp-sync-db',
+  'wp-sync-db/wp-sync-db-cli',
+  'situation/wp-sync-db-media-files'
+];
+
 const dryRun = process.argv.includes('--dry-run');
+
+/**
+ * Migrate from WP Sync DB to Delicious Brains' WP Migrate DB Pro.
+ *
+ * Removes the legacy wp-sync-db/* and situation/wp-sync-db-media-files
+ * packages plus the composer/installers alias they forced, and replaces them
+ * with deliciousbrains-plugin/wp-migrate-db-pro from composer.deliciousbrains.com.
+ */
+function migrateWpMigrateDbPro(composer) {
+  let changed = false;
+
+  for (const pkg of WP_SYNC_DB_PACKAGES) {
+    if (composer.require && composer.require[pkg]) {
+      delete composer.require[pkg];
+      changed = true;
+    }
+    if (composer['require-dev'] && composer['require-dev'][pkg]) {
+      delete composer['require-dev'][pkg];
+      changed = true;
+    }
+  }
+
+  if (!changed) {
+    return false;
+  }
+
+  for (const relPath of ['.conf/migrations', '.conf/connections.yaml']) {
+    const fullPath = path.join(process.cwd(), relPath);
+    if (fs.existsSync(fullPath) && !dryRun) {
+      fs.rmSync(fullPath, { recursive: true, force: true });
+    }
+  }
+
+  // The composer/installers alias was only there to satisfy wp-sync-db's
+  // ~1.0.6 pin. With wp-sync-db gone, let transitive resolution handle it.
+  if (composer.require && composer.require['composer/installers']) {
+    delete composer.require['composer/installers'];
+  }
+
+  const newPackage = 'deliciousbrains-plugin/wp-migrate-db-pro';
+  composer.require = composer.require || {};
+  if (!composer.require[newPackage]) {
+    composer.require[newPackage] = '*';
+  }
+
+  if (!hasRepository(composer, WP_MIGRATE_DB_PRO_REPO.url)) {
+    composer.repositories = composer.repositories || [];
+    composer.repositories.push(WP_MIGRATE_DB_PRO_REPO);
+  }
+
+  return true;
+}
 
 /**
  * Add composer/installers alias when wp-sync-db pins it to ~1.0.6
@@ -316,6 +379,7 @@ function main() {
   // Run all migrations
   let totalChanges = 0;
 
+  if (migrateWpMigrateDbPro(composer)) totalChanges++;
   if (migrateComposerInstallers(composer)) totalChanges++;
   if (migrateKint(composer)) totalChanges++;
   if (migrateTabrisrp(composer)) totalChanges++;
