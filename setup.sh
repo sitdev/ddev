@@ -16,7 +16,6 @@ if [ -d .git ]; then
   # Ensure .gitignore ends with a newline before appending
   [ -f .gitignore ] && [ -n "$(tail -c1 .gitignore)" ] && echo '' >>.gitignore
   grep -q ".ddev" .gitignore || echo '/.ddev' >>.gitignore
-  grep -q ".conf/migrations" .gitignore || echo '/.conf/migrations/*' >>.gitignore
   grep -q "llms.txt" .gitignore || echo '/llms.txt' >>.gitignore
 
   if [ ! -f .git/hooks/post-checkout ]; then
