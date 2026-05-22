@@ -258,6 +258,42 @@ function migrateGravityForms(composer) {
 }
 
 /**
+ * Adopt the sitchco/wp-composer-automator Composer plugin.
+ *
+ * The package subscribes to Composer install events to manage plugins-pro
+ * copies and to install the WP Migrate DB Pro compatibility file into
+ * mu-plugins/, superseding the legacy inline pre/post-install-cmd scripts.
+ *
+ * Idempotent: skipped when the package is already required. Bash scripts
+ * are removed opportunistically — they have no other purpose on these
+ * projects (johnpbloch/wordpress-core-installer creates the wp/ dir itself).
+ */
+function migrateWpComposerAutomator(composer) {
+  const newPackage = 'sitchco/wp-composer-automator';
+
+  if (composer.require && composer.require[newPackage]) {
+    return false;
+  }
+
+  composer.require = composer.require || {};
+  composer.require[newPackage] = 'dev-master';
+
+  composer.config = composer.config || {};
+  composer.config['allow-plugins'] = composer.config['allow-plugins'] || {};
+  composer.config['allow-plugins'][newPackage] = true;
+
+  if (composer.scripts) {
+    delete composer.scripts['pre-install-cmd'];
+    delete composer.scripts['post-install-cmd'];
+    if (Object.keys(composer.scripts).length === 0) {
+      delete composer.scripts;
+    }
+  }
+
+  return true;
+}
+
+/**
  * Normalize repositories to array format (handles both array and object)
  */
 function normalizeRepositories(composer) {
@@ -385,6 +421,7 @@ function main() {
   if (migrateTabrisrp(composer)) totalChanges++;
   if (migrateAcfPro(composer)) totalChanges++;
   if (migrateYoast(composer)) totalChanges++;
+  if (migrateWpComposerAutomator(composer)) totalChanges++;
 
   const migratedGravityPackages = migrateGravityForms(composer);
   if (migratedGravityPackages.length > 0) totalChanges++;
