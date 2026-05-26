@@ -3,7 +3,7 @@
 ## Description: Clean all build files and installed dependencies.
 
 is_running() {
-    ddev exec pwd &>/dev/null
+    ddev describe 2>/dev/null | grep -qE 'web .*OK'
 }
 echo "Cleaning build dependencies..."
 if is_running; then

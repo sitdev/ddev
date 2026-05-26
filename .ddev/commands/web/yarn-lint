@@ -24,7 +24,7 @@ addGitHook() {
 
 list=\$(git diff --cached --name-only --diff-filter=ACM)
 if [[ "\$list" == *".scss"* ]] || [[ "\$list" == *".js"* ]]; then
-  if command -v ddev >/dev/null 2>&1 && ddev exec pwd >/dev/null 2>&1; then
+  if command -v ddev >/dev/null 2>&1 && ddev describe 2>/dev/null | grep -qE 'web .*OK'; then
     echo "Applying formatting..."
     ddev yarn-lint >/dev/null 2>&1
     ddev mutagen sync
