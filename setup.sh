@@ -34,7 +34,7 @@ echo "$revision" >.ddev/.revision
 if [[ "$revision" != "$old_revision" ]]; then
   cp "${script_root}/default-readme.md" ./README.md
 
-  if command -v ddev >/dev/null 2>&1 && ddev exec pwd >/dev/null 2>&1; then
+  if command -v ddev >/dev/null 2>&1 && ddev describe 2>/dev/null | grep -qE 'web .*OK'; then
     ddev replace "{{SITE_TITLE}}" "$SITE_TITLE" ./README.md --silent
   fi
 
