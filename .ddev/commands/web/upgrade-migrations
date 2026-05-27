@@ -46,6 +46,11 @@ const WP_MIGRATE_DB_PRO_REPO = {
   url: 'https://composer.deliciousbrains.com'
 };
 
+const SITCHCO_REPO = {
+  type: 'composer',
+  url: 'https://composer.sitch.co'
+};
+
 const WP_SYNC_DB_PACKAGES = [
   'wp-sync-db/wp-sync-db',
   'wp-sync-db/wp-sync-db-cli',
@@ -263,6 +268,7 @@ function migrateGravityForms(composer) {
  * The package subscribes to Composer install events to manage plugins-pro
  * copies and to install the WP Migrate DB Pro compatibility file into
  * mu-plugins/, superseding the legacy inline pre/post-install-cmd scripts.
+ * It is published to composer.sitch.co, so the repository is added too.
  *
  * Idempotent: skipped when the package is already required. Bash scripts
  * are removed opportunistically — they have no other purpose on these
@@ -277,6 +283,12 @@ function migrateWpComposerAutomator(composer) {
 
   composer.require = composer.require || {};
   composer.require[newPackage] = 'dev-master';
+
+  // sitchco/wp-composer-automator is published to composer.sitch.co
+  if (!hasRepository(composer, SITCHCO_REPO.url)) {
+    composer.repositories = composer.repositories || [];
+    composer.repositories.push(SITCHCO_REPO);
+  }
 
   composer.config = composer.config || {};
   composer.config['allow-plugins'] = composer.config['allow-plugins'] || {};
