@@ -361,7 +361,7 @@ push_connection() {
   echo ""
   echo "Pushing database..."
 
-  if wp migrate push --remote-url="$REMOTE_URL" --secret-key="$SECRET_KEY" --url=${DDEV_PRIMARY_URL}; then
+  if wp migrate push "$REMOTE_URL" "$SECRET_KEY" --url=${DDEV_PRIMARY_URL}; then
     echo ""
     echo "✓ Database pushed successfully!"
     echo ""
