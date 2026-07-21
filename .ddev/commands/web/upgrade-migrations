@@ -51,6 +51,10 @@ const SITCHCO_REPO = {
   url: 'https://composer.sitch.co'
 };
 
+// Servers run PHP 8.2; .99 stands in for "latest 8.2.x" so packages with
+// patch-level requirements (e.g. >=8.2.5) still resolve.
+const PLATFORM_PHP_VERSION = '8.2.99';
+
 const WP_SYNC_DB_PACKAGES = [
   'wp-sync-db/wp-sync-db',
   'wp-sync-db/wp-sync-db-cli',
@@ -306,6 +310,28 @@ function migrateWpComposerAutomator(composer) {
 }
 
 /**
+ * Pin composer's platform PHP to the server version.
+ *
+ * Local DDEV runs PHP ahead of the servers (8.4 vs 8.2), so without a pin
+ * `composer update` resolves packages that require 8.3+ and the deploy
+ * breaks. config.platform.php makes resolution target the servers no matter
+ * what PHP the local container runs.
+ *
+ * Skipped when a platform php is already configured, so a project can set
+ * its own pin without this migration overriding it.
+ */
+function migratePlatformPhp(composer) {
+  if (composer.config && composer.config.platform && composer.config.platform.php) {
+    return false;
+  }
+
+  composer.config = composer.config || {};
+  composer.config.platform = composer.config.platform || {};
+  composer.config.platform.php = PLATFORM_PHP_VERSION;
+  return true;
+}
+
+/**
  * Normalize repositories to array format (handles both array and object)
  */
 function normalizeRepositories(composer) {
@@ -434,6 +460,7 @@ function main() {
   if (migrateAcfPro(composer)) totalChanges++;
   if (migrateYoast(composer)) totalChanges++;
   if (migrateWpComposerAutomator(composer)) totalChanges++;
+  if (migratePlatformPhp(composer)) totalChanges++;
 
   const migratedGravityPackages = migrateGravityForms(composer);
   if (migratedGravityPackages.length > 0) totalChanges++;
