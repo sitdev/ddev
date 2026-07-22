@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Debian's mariadb-client ships an unrelated /usr/bin/replace that reads stdin
+# and hangs when given npm-replace arguments. ~/bin precedes /usr/bin in PATH,
+# so this wrapper wins and delegates to the npm package, installing on demand.
+yarnBin="$(yarn global bin 2>/dev/null)"
+[ -x "${yarnBin}/replace" ] || yarn global add replace >/dev/null 2>&1
+exec "${yarnBin}/replace" "$@"
