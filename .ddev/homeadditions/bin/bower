@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-# yarn global installs land in ~/.yarn/bin (off PATH) on current ddev images,
-# so a bare `bower` is never found. Delegate from ~/bin, installing on demand.
-yarnBin="$(yarn global bin 2>/dev/null)"
-[ -x "${yarnBin}/bower" ] || yarn global add bower >/dev/null 2>&1
-exec "${yarnBin}/bower" "$@"
