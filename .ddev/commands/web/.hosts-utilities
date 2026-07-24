@@ -1,0 +1,145 @@
+#!/usr/bin/env bash
+
+# Hosts matrix for the multisite migration tooling.
+#
+# Layers checked (S11), all read from the bind mount — never `ddev describe`:
+#   1. .conf/.env                 ADDITIONAL_HOSTS="a.baa b.baa ..." (short form)
+#   2. config.local.yaml          additional_hostnames: block ("  - a.baa")
+#   3. compose (runtime)          DDEV_HOSTNAME: a.baa.test,b.baa.test,...
+#   4. traefik (runtime)          HostRegexp(`^a\.baa\.test$`)
+#
+# Writes touch ONLY the ADDITIONAL_HOSTS line of .conf/.env. Mount topology
+# dictates that: the container can only write under the synced project tree
+# (.conf/ — bidirectional), while .ddev/ is read-only from the container
+# (/mnt/ddev_config) and container-side .ddev writes never reach the host.
+# The container also cannot restart DDEV. Both are left to the developer:
+# `make restart` re-runs the platform self-update, which rebuilds
+# config.local.yaml (including additional_hostnames:) from .conf/.env before
+# starting DDEV — so the end-of-run instruction is simply `make restart`.
+
+# Reads prefer the direct .ddev bind mount inside the web container; on the
+# host this resolves to the project .ddev/ (which is also where the host-side
+# regeneration writes).
+MIGRATION_DDEV_DIR="/mnt/ddev_config"
+[ -d "$MIGRATION_DDEV_DIR" ] || MIGRATION_DDEV_DIR=".ddev"
+HOSTS_ENV_FILE=".conf/.env"
+
+# --- per-layer membership (word-boundary token matching only) ---
+
+hosts_in_env() { # <short-host>
+  local esc
+  esc=$(printf '%s' "$1" | sed 's/\./\\./g')
+  grep -E '^ADDITIONAL_HOSTS=' "$HOSTS_ENV_FILE" 2>/dev/null |
+    grep -Eq "(\"| )${esc}( |\")"
+}
+
+hosts_in_config() { # <short-host>
+  local esc
+  esc=$(printf '%s' "$1" | sed 's/\./\\./g')
+  grep -Eq "^[[:space:]]*-[[:space:]]+${esc}[[:space:]]*$" \
+    "$MIGRATION_DDEV_DIR/config.local.yaml" 2>/dev/null
+}
+
+hosts_in_compose() { # <fqdn>
+  grep -m1 'DDEV_HOSTNAME:' "$MIGRATION_DDEV_DIR/.ddev-docker-compose-full.yaml" 2>/dev/null |
+    sed 's/.*DDEV_HOSTNAME: *//' | tr ',' '\n' | grep -qFx "$1"
+}
+
+hosts_in_traefik() { # <fqdn>
+  local pat="^${1//./\\.}\$"
+  grep -rqF "$pat" "$MIGRATION_DDEV_DIR/traefik/config/" 2>/dev/null
+}
+
+# --- writers ---
+
+# hosts_env_append <short-host>... — rewrite only the ADDITIONAL_HOSTS line:
+# tokenize existing + new, sort -u (pre-existing duplicates self-heal).
+hosts_env_append() {
+  local line existing merged new_line
+  line=$(grep -m1 -E '^ADDITIONAL_HOSTS=' "$HOSTS_ENV_FILE" 2>/dev/null || true)
+  existing=$(printf '%s' "$line" | sed -E 's/^ADDITIONAL_HOSTS=//; s/"//g')
+
+  # shellcheck disable=SC2086 — word-splitting the token list is intended
+  merged=$(printf '%s\n' $existing "$@" | grep -v '^$' | sort -u | tr '\n' ' ')
+  merged="${merged% }"
+  new_line="ADDITIONAL_HOSTS=\"${merged}\""
+
+  if [ -n "$line" ]; then
+    awk -v repl="$new_line" '/^ADDITIONAL_HOSTS=/ { print repl; next } { print }' \
+      "$HOSTS_ENV_FILE" >"${HOSTS_ENV_FILE}.tmp" && mv "${HOSTS_ENV_FILE}.tmp" "$HOSTS_ENV_FILE"
+  else
+    printf '%s\n' "$new_line" >>"$HOSTS_ENV_FILE"
+  fi
+}
+
+# --- orchestrator ---
+
+# hosts_matrix_step <check_only true|false> <short-host>...
+# Walks the matrix per host with a specific message per drift shape; appends
+# to ADDITIONAL_HOSTS in .conf/.env as needed. Fully green = zero writes,
+# zero output (N2). Populates HOSTS_RESTART_REQUIRED for the caller.
+HOSTS_RESTART_REQUIRED=()
+hosts_matrix_step() {
+  local check_only="$1"
+  shift
+  HOSTS_RESTART_REQUIRED=()
+  local -a add_env=()
+  local short fqdn in_env in_cfg in_runtime
+
+  for short in "$@"; do
+    fqdn="${short}.${DDEV_TLD}"
+    in_env=false
+    in_cfg=false
+    in_runtime=false
+    hosts_in_env "$short" && in_env=true
+    hosts_in_config "$short" && in_cfg=true
+    if hosts_in_compose "$fqdn" && hosts_in_traefik "$fqdn"; then
+      in_runtime=true
+    fi
+
+    if [ "$in_env" = false ]; then
+      echo "hosts: '$short' is new — adding it to ADDITIONAL_HOSTS in .conf/.env ('make restart' rebuilds config.local.yaml from it)."
+      add_env+=("$short")
+      HOSTS_RESTART_REQUIRED+=("$fqdn")
+    elif [ "$in_cfg" = false ]; then
+      echo "hosts: .conf/.env already contains '$short', but config.local.yaml is missing it — 'make restart' rebuilds it."
+      HOSTS_RESTART_REQUIRED+=("$fqdn")
+    elif [ "$in_runtime" = false ]; then
+      echo "hosts: config is current, but the running router does not know '$fqdn' — a restart is needed."
+      HOSTS_RESTART_REQUIRED+=("$fqdn")
+    fi
+  done
+
+  # N4: runtime-only hosts absent from source config — informational note
+  # only; never auto-removed (a future restart drops them naturally).
+  local stale
+  stale=$(grep -m1 'DDEV_HOSTNAME:' "$MIGRATION_DDEV_DIR/.ddev-docker-compose-full.yaml" 2>/dev/null |
+    sed 's/.*DDEV_HOSTNAME: *//' | tr ',' '\n' | sed "s/\.${DDEV_TLD}\$//" |
+    while read -r h; do
+      [ -n "$h" ] || continue
+      [ "$h" = "${DDEV_SITENAME}" ] && continue
+      hosts_in_env "$h" || echo "$h"
+    done | tr '\n' ' ')
+  if [ -n "${stale% }" ]; then
+    echo "hosts: note — the running config knows hostnames that are no longer in .conf/.env"
+    echo "       (stale; a future restart drops them): ${stale% }"
+  fi
+
+  if [ "$check_only" = true ]; then
+    if [ ${#HOSTS_RESTART_REQUIRED[@]} -gt 0 ]; then
+      echo "[dry-run] hosts that would be added/flagged for restart: ${HOSTS_RESTART_REQUIRED[*]}"
+      HOSTS_RESTART_REQUIRED=()
+    fi
+    return 0
+  fi
+
+  if [ ${#add_env[@]} -gt 0 ]; then
+    hosts_env_append "${add_env[@]}"
+  fi
+  if [ ${#HOSTS_RESTART_REQUIRED[@]} -gt 0 ]; then
+    echo ""
+    echo "hosts: a DDEV restart is required before these are reachable in the browser:"
+    printf '  %s\n' "${HOSTS_RESTART_REQUIRED[@]}"
+    echo "hosts: the migration continues — run 'make restart' from the host when it finishes."
+  fi
+}

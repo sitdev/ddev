@@ -1,15 +1,26 @@
 #!/usr/bin/env bash
 
 ## Description: Run a WP Migrate Pro environment pull from connections.json
-## Usage: run-migration <branch> [--skip-media]
-## Example: "ddev run-migration develop" or "ddev run-migration master --skip-media"
+## Usage: run-migration <branch> [flags]
+## Example: "ddev run-migration release --subsites=boston,miami --skip-media"
 
 set -euo pipefail
 
 # Configuration
 CONNECTIONS_FILE=".conf/migrations/connections.json"
+MEDIA_REFRESH_SENTINEL=".conf/migrations/.media-last-refresh"
 BRANCH=""
 SKIP_MEDIA=false
+LIST_SUBSITES=false
+SUBSITES_ARG=""
+SUBSITES_GIVEN=false
+BASE_ONLY=false
+FORCE_BASE=false
+DRY_RUN=false
+NETWORK_MEDIA_FLAG="" # "", "on" (--network-media), "off" (--skip-network-media)
+REFRESH_NETWORK_MEDIA=false
+
+source "$(dirname "${BASH_SOURCE[0]}")/.migration-utilities"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -18,20 +29,73 @@ while [[ $# -gt 0 ]]; do
       SKIP_MEDIA=true
       shift
       ;;
+    --subsites=*)
+      SUBSITES_ARG="${1#*=}"
+      SUBSITES_GIVEN=true
+      shift
+      ;;
+    --subsites)
+      echo "Error: --subsites requires a value: --subsites=<market,market,...>" >&2
+      exit 1
+      ;;
+    --base-only)
+      BASE_ONLY=true
+      shift
+      ;;
+    --force-base)
+      FORCE_BASE=true
+      shift
+      ;;
+    --dry-run)
+      DRY_RUN=true
+      shift
+      ;;
+    --network-media)
+      NETWORK_MEDIA_FLAG="on"
+      shift
+      ;;
+    --skip-network-media)
+      NETWORK_MEDIA_FLAG="off"
+      shift
+      ;;
+    --refresh-network-media)
+      REFRESH_NETWORK_MEDIA=true
+      shift
+      ;;
+    --list-subsites)
+      LIST_SUBSITES=true
+      shift
+      ;;
     --help|-h)
-      echo "Usage: ddev run-migration <branch> [--skip-media]"
+      echo "Usage: ddev run-migration <branch> [flags]"
       echo ""
       echo "Pull database (and optionally media) from a remote environment using WP Migrate Pro."
       echo ""
       echo "Arguments:"
-      echo "  <branch>       Branch name (key in connections.json, e.g., 'develop', 'master')"
+      echo "  <branch>       Branch name (key in connections.json, e.g., 'release', 'production')"
       echo ""
       echo "Options:"
-      echo "  --skip-media   Skip media sync entirely (database only)"
+      echo "  --skip-media             Skip media sync entirely (all scopes, database only)"
+      echo ""
+      echo "Multisite options:"
+      echo "  --subsites=<list>        Market slugs and/or numeric blog IDs, comma-separated"
+      echo "  --base-only              Pull exactly the atomic base set (network + blog-1 tables)"
+      echo "  --list-subsites          Print the remote network map (blog_id, slug, url) and exit."
+      echo "                           Needs no local DB, vendor, or plugin — safe on a fresh clone."
+      echo "  --network-media          Force network/blog-1 media even when the base pull is skipped"
+      echo "  --skip-network-media     Suppress network media even when the base pulls"
+      echo "  --refresh-network-media  Standalone network media refresh (re-pulls base tables too —"
+      echo "                           see the warning it prints)"
+      echo "  --force-base             Override the automatic base-pull policy"
+      echo "  --dry-run                Print planned operations and rewrite pairs, pull nothing"
+      echo ""
+      echo "Exit codes: 0 success · 1 nothing attempted · 2 partial (something failed or was"
+      echo "skipped with a warning) · 130 interrupted (partial summary printed)"
       echo ""
       echo "Examples:"
-      echo "  ddev run-migration develop           # Pull develop with automatic media handling"
-      echo "  ddev run-migration master --skip-media  # Pull master database only"
+      echo "  ddev run-migration release --subsites=boston,miami --skip-media"
+      echo "  ddev run-migration release --base-only"
+      echo "  ddev run-migration production --list-subsites"
       exit 0
       ;;
     -*)
@@ -54,7 +118,7 @@ done
 if [ -z "$BRANCH" ]; then
   echo "Error: Branch name is required." >&2
   echo "" >&2
-  echo "Usage: ddev run-migration <branch> [--skip-media]" >&2
+  echo "Usage: ddev run-migration <branch> [flags]" >&2
   echo "" >&2
   if [ -f "$CONNECTIONS_FILE" ]; then
     echo "Available connections:" >&2
@@ -74,27 +138,70 @@ elif ! jq -e ".\"$BRANCH\"" "$CONNECTIONS_FILE" >/dev/null 2>&1; then
   connection_missing=true
 fi
 
-# If connection is missing, launch interactive menu
+# Unknown connection is a hard error; never fall back to the interactive menu.
 if [ "$connection_missing" = true ]; then
-  echo "" >&2
-  echo "Connection '$BRANCH' not found." >&2
+  echo "Error: Connection '$BRANCH' not found." >&2
 
   if [ -f "$CONNECTIONS_FILE" ] && [ "$(jq 'keys | length' "$CONNECTIONS_FILE" 2>/dev/null)" -gt 0 ]; then
     echo "Available connections: $(jq -r 'keys | join(", ")' "$CONNECTIONS_FILE")" >&2
   else
-    echo "No connections configured yet." >&2
+    echo "No connections configured yet. Run 'ddev migration' to add connections." >&2
   fi
 
-  echo "" >&2
-  echo "Launching interactive migration menu..." >&2
-  echo "" >&2
-
-  exec bash .ddev/commands/web/migration
+  exit 1
 fi
 
 REMOTE_URL=$(jq -r ".\"$BRANCH\".url" "$CONNECTIONS_FILE")
 SECRET_KEY=$(jq -r ".\"$BRANCH\".secret" "$CONNECTIONS_FILE")
 LABEL=$(jq -r ".\"$BRANCH\".label // \"$BRANCH\"" "$CONNECTIONS_FILE")
+
+# --list-subsites: print the remote network map and exit. Runs before any
+# wp/plugin/DB interaction so it works on a completely fresh clone.
+if [ "$LIST_SUBSITES" = true ]; then
+  MAP_JSON=$(fetch_topology "$REMOTE_URL" "$SECRET_KEY") || exit 1
+
+  if [ "$(printf '%s' "$MAP_JSON" | jq -r '.site_details.is_multisite // "false"')" != "true" ]; then
+    echo "Remote '$LABEL' ($REMOTE_URL) is not a multisite — no subsites to list."
+    exit 0
+  fi
+
+  ROOT_DOMAIN=$(jq -r ".\"$BRANCH\".root_domain // empty" "$CONNECTIONS_FILE")
+  if [ -z "$ROOT_DOMAIN" ]; then
+    remote_main_host=$(printf '%s' "$MAP_JSON" | jq -r '.url // empty')
+    remote_main_host="${remote_main_host#*://}"
+    remote_main_host="${remote_main_host%%/*}"
+    conn_host="${REMOTE_URL#*://}"
+    conn_host="${conn_host%%/*}"
+    ROOT_DOMAIN=$(derive_root_domain "$remote_main_host" "$conn_host")
+  fi
+
+  printf '%-8s %-24s %s\n' "blog_id" "slug" "url"
+  printf '%s' "$MAP_JSON" | jq -r --arg root "$ROOT_DOMAIN" '
+    (.subsites // {}) | to_entries
+    | sort_by(.key | tonumber)
+    | .[]
+    | (.value | sub("^https?://"; "") | sub("/.*$"; "")) as $host
+    | ($host
+       | if $root != "" and endswith("." + $root)
+         then .[0:length - (($root | length) + 1)]
+         else . end) as $slug
+    | [.key, $slug, .value] | @tsv' |
+    awk -F'\t' '{printf "%-8s %-24s %s\n", $1, $2, $3}'
+  exit 0
+fi
+
+# ===========================================================================
+# Single-site path — legacy behavior, unchanged (spec constraint 1 / N1)
+# ===========================================================================
+if ! is_wp_multisite; then
+
+if [ "$SUBSITES_GIVEN" = true ] || [ "$BASE_ONLY" = true ] || [ "$FORCE_BASE" = true ] ||
+  [ "$REFRESH_NETWORK_MEDIA" = true ] || [ -n "$NETWORK_MEDIA_FLAG" ] || [ "$DRY_RUN" = true ]; then
+  echo "Error: multisite options (--subsites/--base-only/--force-base/--network-media/" >&2
+  echo "--skip-network-media/--refresh-network-media/--dry-run) require a multisite project" >&2
+  echo "(no WP_ALLOW_MULTISITE in wp-config.php)." >&2
+  exit 1
+fi
 
 echo "=================================================="
 echo "WP Migrate Pro: Pulling from $LABEL"
@@ -182,3 +289,823 @@ echo ""
 echo "=================================================="
 echo "Migration completed successfully!"
 echo "=================================================="
+exit 0
+
+fi
+
+# ===========================================================================
+# Multisite engine
+# ===========================================================================
+
+# --- Serial-loop status tracking (S14) ---
+declare -a ITEM_NAMES=()
+declare -a ITEM_STATUS=()
+BASE_STATUS="skipped"
+BASE_REASON=""
+MEDIA_NOTE=""
+PARTIAL=false
+VALIDATION_FAILED_NETWORK=false
+VALIDATION_FAILED_MARKETS=false
+VALIDATION_FAILED_SITEURLS=false
+
+print_restart_instruction() {
+  if [ ${#HOSTS_RESTART_REQUIRED[@]} -gt 0 ]; then
+    echo ""
+    echo "Restart required: run 'make restart' from the host to make these hostnames"
+    echo "reachable (it rebuilds config.local.yaml from .conf/.env, then restarts):"
+    echo "  ${HOSTS_RESTART_REQUIRED[*]}"
+  fi
+}
+
+print_summary() {
+  local mode="${1:-final}"
+  echo ""
+  echo "=================================================="
+  if [ "$mode" = "partial" ]; then
+    echo "Migration interrupted — partial summary"
+  else
+    echo "Migration summary"
+  fi
+  echo "=================================================="
+  echo "base: ${BASE_STATUS}${BASE_REASON:+ (${BASE_REASON})}"
+  local i
+  for i in "${!ITEM_NAMES[@]}"; do
+    echo "${ITEM_NAMES[$i]}: ${ITEM_STATUS[$i]}"
+  done
+  if [ -n "$MEDIA_NOTE" ]; then
+    echo "$MEDIA_NOTE"
+  fi
+  echo "=================================================="
+}
+
+# --- Remote map helpers (all read MAP_JSON / ROOT_DOMAIN globals) ---
+
+host_for_id() {
+  printf '%s' "$MAP_JSON" |
+    jq -r --arg id "$1" '.subsites[$id] // empty' |
+    sed -E 's|^https?://||; s|/.*$||; s|:.*$||'
+}
+
+slug_for_id() {
+  local host
+  host=$(host_for_id "$1")
+  if [ -n "$ROOT_DOMAIN" ] && [[ "$host" == *".${ROOT_DOMAIN}" ]]; then
+    printf '%s\n' "${host%."$ROOT_DOMAIN"}"
+  else
+    printf '%s\n' "$host"
+  fi
+}
+
+id_for_slug() {
+  local want="$1.${ROOT_DOMAIN}"
+  printf '%s' "$MAP_JSON" | jq -r --arg want "$want" '
+    .subsites | to_entries[]
+    | select((.value | sub("^https?://"; "") | sub("/.*$"; "") | sub(":.*$"; "")) == $want)
+    | .key' | head -1
+}
+
+available_markets() {
+  printf '%s' "$MAP_JSON" | jq -r --arg root "$ROOT_DOMAIN" '
+    .subsites | to_entries[] | select(.key != "1")
+    | .key as $id
+    | (.value | sub("^https?://"; "") | sub("/.*$"; "")) as $host
+    | ($host
+       | if $root != "" and endswith("." + $root)
+         then .[0:length - (($root | length) + 1)]
+         else . end) as $slug
+    | "  \($slug) (blog \($id))"'
+}
+
+# --- Token resolution (S7: warn-and-skip, dedupe by blog ID, blog 1 never) ---
+
+SELECTED_IDS=()
+SELECTED_SLUGS=()
+
+resolve_subsite_tokens() {
+  local -a tokens=()
+  local token id slug any_valid=false
+  IFS=, read -ra tokens <<<"$SUBSITES_ARG"
+
+  for token in "${tokens[@]}"; do
+    token=$(printf '%s' "$token" | tr -d '[:space:]')
+    [ -n "$token" ] || continue
+
+    if [[ "$token" =~ ^[0-9]+$ ]]; then
+      id="$token"
+      if [ "$id" = "1" ]; then
+        echo "WARNING: '1' skipped — blog 1 is the network base and is never pulled as a subsite." >&2
+        ITEM_NAMES+=("$token")
+        ITEM_STATUS+=("REJECTED (blog 1 is part of base)")
+        PARTIAL=true
+        continue
+      fi
+      if ! printf '%s' "$MAP_JSON" | jq -e --arg id "$id" '.subsites | has($id)' >/dev/null 2>&1; then
+        echo "WARNING: unknown blog ID '$token' — not in the remote network. Available markets:" >&2
+        available_markets >&2
+        ITEM_NAMES+=("$token")
+        ITEM_STATUS+=("UNKNOWN")
+        PARTIAL=true
+        continue
+      fi
+      slug=$(slug_for_id "$id")
+    else
+      id=$(id_for_slug "$token")
+      if [ -z "$id" ]; then
+        echo "WARNING: unknown market '$token' — not in the remote network. Available markets:" >&2
+        available_markets >&2
+        ITEM_NAMES+=("$token")
+        ITEM_STATUS+=("UNKNOWN")
+        PARTIAL=true
+        continue
+      fi
+      if [ "$id" = "1" ]; then
+        echo "WARNING: '$token' skipped — blog 1 is the network base and is never pulled as a subsite." >&2
+        ITEM_NAMES+=("$token")
+        ITEM_STATUS+=("REJECTED (blog 1 is part of base)")
+        PARTIAL=true
+        continue
+      fi
+      slug="$token"
+    fi
+
+    # Dedupe by resolved blog ID (covers duplicate tokens and slug+ID aliases).
+    if [[ " ${SELECTED_IDS[*]-} " == *" $id "* ]]; then
+      continue
+    fi
+    SELECTED_IDS+=("$id")
+    SELECTED_SLUGS+=("$slug")
+    any_valid=true
+  done
+
+  if [ "$any_valid" = false ]; then
+    echo "" >&2
+    echo "Error: no token in --subsites=${SUBSITES_ARG} resolves to a pullable market." >&2
+    echo "Available markets:" >&2
+    available_markets >&2
+    return 1
+  fi
+}
+
+# --- Custom-domain markets hard-fail until mapped (S13) ---
+
+check_custom_domains() {
+  local i id slug host covered f
+  for i in "${!SELECTED_IDS[@]}"; do
+    id="${SELECTED_IDS[$i]}"
+    slug="${SELECTED_SLUGS[$i]}"
+    host=$(host_for_id "$id")
+    if [[ "$host" == *".${ROOT_DOMAIN}" ]]; then
+      continue
+    fi
+    covered=false
+    for f in "${REWRITE_FIND[@]}"; do
+      if [[ "$f" == *"$host"* ]]; then
+        covered=true
+        break
+      fi
+    done
+    if [ "$covered" = false ]; then
+      echo "Error: market '$slug' (blog $id) uses the custom domain '$host', which the derived" >&2
+      echo "rewrites ('.${REMOTE_ROOT}' → '.${LOCAL_ROOT}') cannot cover — pulling it would leave stale" >&2
+      echo "remote URLs in the migrated site." >&2
+      echo "" >&2
+      echo "Add an explicit replacement for connection '$BRANCH' in $CONNECTIONS_FILE, e.g.:" >&2
+      echo "  \"replacements\": [{ \"find\": \"//$host\", \"replace\": \"//<local-host>\" }]" >&2
+      echo "then re-run. Note: its local hostname must also be added to ADDITIONAL_HOSTS manually." >&2
+      return 1
+    fi
+  done
+}
+
+# --- Pull commands (bash arrays; never eval — quoting + secret masking) ---
+
+run_wp_migrate() {
+  # run_wp_migrate <label> <cmd...> — dry-run aware executor.
+  local what="$1"
+  shift
+  if [ "$DRY_RUN" = true ]; then
+    echo "[dry-run] $what:"
+    mask_secret "  $*" "$SECRET_KEY"
+    return 0
+  fi
+  "$@"
+}
+
+# Excluded alongside the subsite trees: uploads/wp-sync-db on the remote is
+# legacy WP Sync DB dump litter (~7.4 GB of DB exports) that deterministically
+# killed the media stream mid-first-batch (prototype findings 2026-07-23).
+# WP Migrate auto-excludes its own wp-migrate-db* uploads dir but not its
+# predecessor's. Patterns are comma-separated in one flag; matching is
+# unanchored glob (Excludes::pathMatches), so a bare token matches anywhere.
+NETWORK_MEDIA_EXCLUDES="**/sites/*,wp-sync-db"
+
+network_media_args() {
+  # Network (blog-1) media scoping — PROVISIONAL variant (b) pending prototype
+  # item 1 (docs/discovery/multisite-migration/prototype-findings.md): pull
+  # blog-1 media by excluding every subsite tree; no --subsite-* flags.
+  if [ "$1" = "with-media" ]; then
+    printf '%s\n' "--media=all" "--exclude-media=${NETWORK_MEDIA_EXCLUDES}"
+  else
+    printf '%s\n' "--exclude-media=*"
+  fi
+}
+
+run_base_pull() {
+  # $1: "with-media" | "no-media" ; $2 (optional): "since-date <date>"
+  local media_mode="$1"
+  local base_tables
+  base_tables=$(build_base_tables "$MAP_JSON")
+  if [ -z "$base_tables" ]; then
+    echo "Error: could not derive the base table list from the remote map." >&2
+    return 1
+  fi
+
+  local -a cmd=(wp migrate pull "$REMOTE_URL" "$SECRET_KEY" "--url=${DDEV_PRIMARY_URL}")
+  cmd+=("--include-tables=${base_tables}")
+  cmd+=("--find=$(rewrite_find_list)" "--replace=$(rewrite_replace_list)")
+
+  if [ "$media_mode" = "since-date" ]; then
+    # --media=since-date only filters because mu-plugins/
+    # wp-migrate-db-pro-cli-media-date-fix.php remaps it to the UI's 'new'
+    # option — the stock 2.7.x CLI drops the date silently.
+    cmd+=("--media=since-date" "--media-date=${2}" "--exclude-media=${NETWORK_MEDIA_EXCLUDES}")
+  else
+    local line
+    while IFS= read -r line; do cmd+=("$line"); done < <(network_media_args "$media_mode")
+  fi
+
+  if [ "$DRY_RUN" = true ]; then
+    echo "[dry-run] base pull ($(printf '%s' "$base_tables" | awk -F, '{print NF}') tables):"
+    mask_secret "  ${cmd[*]}" "$SECRET_KEY"
+    return 0
+  fi
+  "${cmd[@]}" || return 1
+  verify_pull_finalized "the base pull"
+}
+
+run_subsite_pull() {
+  # $1: blog id, $2: slug, $3: "with-media" | "no-media"
+  local id="$1" slug="$2" media_mode="$3"
+  local tables
+  tables=$(build_subsite_tables "$MAP_JSON" "$id")
+  if [ -z "$tables" ]; then
+    echo "Error: the remote has no tables for blog $id ($slug)." >&2
+    return 1
+  fi
+
+  # Constraint: --subsite-* never appears without an explicit --include-tables.
+  local -a cmd=(wp migrate pull "$REMOTE_URL" "$SECRET_KEY" "--url=${DDEV_PRIMARY_URL}")
+  cmd+=("--subsite-source=${id}" "--subsite-destination=${id}")
+  cmd+=("--include-tables=${tables}")
+  cmd+=("--find=$(rewrite_find_list)" "--replace=$(rewrite_replace_list)")
+  if [ "$media_mode" = "with-media" ]; then
+    cmd+=("--media=all")
+  else
+    cmd+=("--exclude-media=*")
+  fi
+
+  if [ "$DRY_RUN" = true ]; then
+    echo "[dry-run] subsite pull $slug (blog $id, $(printf '%s' "$tables" | awk -F, '{print NF}') tables):"
+    mask_secret "  ${cmd[*]}" "$SECRET_KEY"
+    return 0
+  fi
+  "${cmd[@]}" || return 1
+  verify_pull_finalized "the ${slug} pull"
+}
+
+# --- Post-pull cleanup (global; per-subsite cache handling happens in-loop) ---
+
+post_migration_cleanup() {
+  [ "$DRY_RUN" = true ] && return 0
+  echo ""
+  echo "Running post-migration cleanup..."
+
+  for plugin in wp-rocket redis-cache w3-total-cache; do
+    if wp plugin is-active "$plugin" --url="${DDEV_PRIMARY_URL}" >/dev/null 2>&1; then
+      echo "  - Deactivating $plugin"
+      wp plugin deactivate "$plugin" --url="${DDEV_PRIMARY_URL}" >/dev/null 2>&1 || true
+    fi
+  done
+
+  if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    if git diff --quiet wp-config.php 2>/dev/null || [ -z "$(git status --porcelain wp-config.php 2>/dev/null)" ]; then
+      : # wp-config.php is unchanged, nothing to restore
+    else
+      echo "  - Restoring wp-config.php from git"
+      git restore --staged wp-config.php >/dev/null 2>&1 || true
+      git restore wp-config.php >/dev/null 2>&1 || true
+    fi
+  fi
+
+  echo "  - Flushing WordPress cache"
+  wp cache flush --url="${DDEV_PRIMARY_URL}" >/dev/null 2>&1 || true
+}
+
+# --- Post-pull media validation (S16: file_exists, never HTTP status) ---
+
+validate_media_for_blog() {
+  # $1: blog id ("1" = network/base), $2: display name
+  local id="$1" name="$2"
+  local prefix meta_table upload_prefix baseurl
+  prefix=$(printf '%s' "$MAP_JSON" | jq -r '.prefix')
+  if [ "$id" = "1" ]; then
+    meta_table="${prefix}postmeta"
+    upload_prefix="wp-content/uploads"
+  else
+    meta_table="${prefix}${id}_postmeta"
+    upload_prefix="wp-content/uploads/sites/${id}"
+  fi
+  baseurl=$(printf '%s' "$MAP_JSON" |
+    jq -r --arg id "$id" '.site_details.subsites_info[$id].uploads.baseurl // empty')
+
+  local sampled=0 missing=0 upstream_missing=0 transfer_failed=0
+  local path status
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    sampled=$((sampled + 1))
+    if [ -f "${upload_prefix}/${path}" ]; then
+      continue
+    fi
+    missing=$((missing + 1))
+    if [ -n "$baseurl" ]; then
+      status=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 -I "${baseurl%/}/${path}" 2>/dev/null || echo "000")
+      if [ "$status" = "200" ]; then
+        transfer_failed=$((transfer_failed + 1))
+        echo "    missing locally, exists upstream: ${upload_prefix}/${path}"
+      elif [ "$status" = "000" ]; then
+        upstream_missing=$((upstream_missing + 1))
+        echo "    missing locally, upstream unreachable (could not verify): ${upload_prefix}/${path}"
+      else
+        upstream_missing=$((upstream_missing + 1))
+        echo "    missing locally AND upstream (HTTP $status): ${upload_prefix}/${path}"
+      fi
+    fi
+  done < <(mysql -h db -u db -pdb db -N \
+    -e "SELECT meta_value FROM ${meta_table} WHERE meta_key='_wp_attached_file' ORDER BY meta_id DESC LIMIT 20" 2>/dev/null)
+
+  if [ "$sampled" -eq 0 ]; then
+    echo "  ${name}: no attachments to sample."
+    return 0
+  fi
+  if [ "$missing" -eq 0 ]; then
+    echo "  ${name}: ${sampled}/${sampled} sampled files present on disk."
+    return 0
+  fi
+  echo "  ${name}: ${missing}/${sampled} sampled files missing locally (${transfer_failed} exist upstream — transfer problem; ${upstream_missing} absent upstream too)."
+  echo "  Note: a local HTTP 500 on an uploads URL is usually the wp-content rewrite loop for"
+  echo "  missing files, not evidence about the file itself — trust the disk checks above."
+  # Majority of the sample confirmed upstream but absent locally = the media
+  # stage did not deliver. (A stray file or two is not treated as failure.)
+  if [ "$transfer_failed" -gt $((sampled / 2)) ]; then
+    return 1
+  fi
+  return 0
+}
+
+validate_pulled_media() {
+  # $1: "yes"/"no" network media pulled; remaining args: "id:slug" pairs pulled
+  # with media. Returns 1 (and sets the VALIDATION_FAILED_* globals) when a
+  # scope's sample shows the transfer did not deliver.
+  local network="$1"
+  shift
+  [ "$DRY_RUN" = true ] && return 0
+  if [ "$network" = "no" ] && [ $# -eq 0 ]; then
+    return 0
+  fi
+  echo ""
+  echo "Validating pulled media (sampled from _wp_attached_file, checked on disk)..."
+  if [ "$network" = "yes" ]; then
+    validate_media_for_blog "1" "network (blog 1)" || VALIDATION_FAILED_NETWORK=true
+  fi
+  local pair
+  for pair in "$@"; do
+    validate_media_for_blog "${pair%%:*}" "${pair#*:}" || VALIDATION_FAILED_MARKETS=true
+  done
+  [ "$VALIDATION_FAILED_NETWORK" = false ] && [ "$VALIDATION_FAILED_MARKETS" = false ]
+}
+
+validate_pulled_siteurls() {
+  # args: "id:slug" pairs pulled OK. Each market's siteurl option must carry no
+  # trace of the remote — its domain, the root, or their dashed admin forms. A
+  # leftover means the rewrite pair set only half-covered the market (the
+  # FTL-on-beta failure class: domain rewritten, dashed path missed), and the
+  # sunrise fallback then masks it by silently serving the main site's admin.
+  [ "$DRY_RUN" = true ] && return 0
+  [ $# -eq 0 ] && return 0
+  local prefix pair id slug host siteurl leftover needle local_dashed
+  prefix=$(printf '%s' "$MAP_JSON" | jq -r '.prefix')
+  echo ""
+  echo "Validating market siteurls (no stale remote domains/admin paths)..."
+  for pair in "$@"; do
+    id="${pair%%:*}"
+    slug="${pair#*:}"
+    host=$(host_for_id "$id")
+    siteurl=$(mysql -h db -u db -pdb db -N \
+      -e "SELECT option_value FROM ${prefix}${id}_options WHERE option_name='siteurl'" 2>/dev/null)
+    if [ -z "$siteurl" ]; then
+      echo "  ${slug}: could not read siteurl from ${prefix}${id}_options — skipping."
+      continue
+    fi
+    leftover=""
+    for needle in "$host" "${host//./-}" ".${REMOTE_ROOT}" "-${REMOTE_ROOT//./-}"; do
+      if [[ "$siteurl" == *"$needle"* ]]; then
+        leftover="$needle"
+        break
+      fi
+    done
+    if [ -n "$leftover" ]; then
+      VALIDATION_FAILED_SITEURLS=true
+      echo "  ${slug}: siteurl '${siteurl}' still references the remote ('${leftover}')."
+      echo "    Admin links for this market will silently land on the main site's dashboard."
+      echo "    Fix the rewrite pair set (root_domain / replacements) and re-pull, or repair:"
+      if [[ "$host" == *".${REMOTE_ROOT}" ]]; then
+        local_dashed="${host%."$REMOTE_ROOT"}-${LOCAL_ROOT//./-}"
+        echo "    UPDATE ${prefix}${id}_options SET option_value='https://${ADMIN_PREFIX}${LOCAL_ROOT}/${local_dashed}' WHERE option_name='siteurl';"
+      else
+        echo "    (custom-domain market — set siteurl to https://${ADMIN_PREFIX}${LOCAL_ROOT}/<dashed local domain> per its replacements mapping)"
+      fi
+    else
+      echo "  ${slug}: siteurl OK (${siteurl})"
+    fi
+  done
+  [ "$VALIDATION_FAILED_SITEURLS" = false ]
+}
+
+# --- Engine flow ---
+
+echo "=================================================="
+echo "WP Migrate Pro: Pulling from $LABEL (multisite)"
+echo "=================================================="
+echo "Branch: $BRANCH"
+echo "Remote: $REMOTE_URL"
+echo ""
+
+# Cold start, non-interactive: run the idempotent bootstrap chain inline,
+# loudly logged, any connection — no production gate (S6). Dry runs never
+# mutate anything, bootstrap included.
+if is_cold_db && [ "$DRY_RUN" != true ]; then
+  echo "Cold (empty) local database detected — bootstrapping before the pull."
+  if ! run_bootstrap; then
+    exit 1
+  fi
+fi
+
+load_connection "$BRANCH"
+
+echo "Fetching remote site map..."
+MAP_JSON=$(fetch_topology "$REMOTE_URL" "$SECRET_KEY") || exit 1
+
+if [ "$(printf '%s' "$MAP_JSON" | jq -r '.site_details.is_multisite // "false"')" != "true" ]; then
+  echo "Error: this project is multisite but the remote at $REMOTE_URL is not — refusing to pull." >&2
+  exit 1
+fi
+
+resolve_root_domain "$MAP_JSON" || exit 1
+derive_roots
+build_rewrite_pairs "$MAP_JSON" || exit 1
+
+# Clear staging junk from earlier crashed/killed runs up front, so leftover
+# _mig_ tables after a pull are a clean "finalize never ran" signal.
+if [ "$DRY_RUN" != true ]; then
+  stale=$(list_staging_leftovers)
+  if [ -n "$stale" ]; then
+    echo "Dropping $(printf '%s\n' "$stale" | wc -l | tr -d ' ') stale WP Migrate staging tables left by an earlier run..."
+    drop_staging_leftovers
+  fi
+fi
+
+if [ "$DRY_RUN" = true ]; then
+  echo ""
+  echo "[dry-run] connection: $BRANCH ($LABEL)"
+  echo "[dry-run] remote root: ${REMOTE_ROOT} (${ROOT_DOMAIN_SOURCE}) → local root: ${LOCAL_ROOT}"
+  echo "[dry-run] rewrite pairs (applied in order, first match wins on overlap):"
+  for i in "${!REWRITE_FIND[@]}"; do
+    printf '  %-10s %s -> %s\n' "(${REWRITE_SOURCE[$i]})" "${REWRITE_FIND[$i]}" "${REWRITE_REPLACE[$i]}"
+  done
+fi
+
+# --- Scope selection ---
+
+if [ "$REFRESH_NETWORK_MEDIA" = true ]; then
+  echo ""
+  echo "Refresh network media (blog-1 scope)."
+  echo "WARNING: this operation re-pulls the base network tables (users, blog-1 content,"
+  echo "network settings) from the remote along with the media — local changes to network"
+  echo "state will be overwritten. It is NOT a files-only sync."
+  media_date=""
+  if [ -f "$MEDIA_REFRESH_SENTINEL" ]; then
+    media_date=$(head -1 "$MEDIA_REFRESH_SENTINEL" | tr -d '\n')
+  fi
+  BASE_STATUS="pulling"
+  if [ -n "$media_date" ]; then
+    echo "Media scope: files modified since ${media_date} (from $MEDIA_REFRESH_SENTINEL)."
+    if run_base_pull "since-date" "$media_date"; then
+      BASE_STATUS="OK"
+    else
+      BASE_STATUS="FAILED"
+    fi
+  else
+    echo "No media-refresh timestamp found ($MEDIA_REFRESH_SENTINEL missing) — falling back"
+    echo "to a full network media pull (--media=all). This is slower; the timestamp is"
+    echo "stamped after each successful network media pull to make future refreshes fast."
+    if run_base_pull "with-media"; then
+      BASE_STATUS="OK"
+    else
+      BASE_STATUS="FAILED"
+    fi
+  fi
+  # Stamp only after the pulled files verifiably exist on disk — WP Migrate's
+  # exit code alone is not evidence the media transferred (prototype item 4).
+  refresh_ok=false
+  if [ "$DRY_RUN" = true ]; then
+    refresh_ok=true
+  elif [ "$BASE_STATUS" = "OK" ]; then
+    post_migration_cleanup
+    if validate_pulled_media "yes"; then
+      date '+%Y-%m-%d %H:%M:%S' >"$MEDIA_REFRESH_SENTINEL"
+      refresh_ok=true
+      MEDIA_NOTE="network media: OK (refresh timestamp stamped)"
+    else
+      MEDIA_NOTE="network media: FAILED — sampled files did not transfer (see validation above); timestamp NOT stamped"
+    fi
+  fi
+  print_summary
+  [ "$refresh_ok" = true ] && exit 0 || exit 2
+fi
+
+if [ "$SUBSITES_GIVEN" = true ] && [ "$BASE_ONLY" = true ]; then
+  echo "Error: --subsites and --base-only are mutually exclusive." >&2
+  exit 1
+fi
+
+if [ "$SUBSITES_GIVEN" = true ]; then
+  resolve_subsite_tokens || exit 1
+  check_custom_domains || exit 1
+
+  # Hosts matrix (S11): once, after selection, before any pull. The sentinel
+  # is written now so a later pull failure cannot lose it (S12).
+  local_base="${LOCAL_ROOT%."$DDEV_TLD"}"
+  host_shorts=()
+  for i in "${!SELECTED_IDS[@]}"; do
+    h=$(host_for_id "${SELECTED_IDS[$i]}")
+    if [[ "$h" == *".${REMOTE_ROOT}" ]]; then
+      host_shorts+=("${h%."$REMOTE_ROOT"}.${local_base}")
+    else
+      echo "hosts: note — '${SELECTED_SLUGS[$i]}' uses a custom domain; add its local hostname to ADDITIONAL_HOSTS manually."
+    fi
+  done
+  if [ ${#host_shorts[@]} -gt 0 ]; then
+    hosts_matrix_step "$DRY_RUN" "${host_shorts[@]}"
+  fi
+elif [ "$BASE_ONLY" = false ]; then
+  # Bare multisite invocation: deprecated full-network pull (S9).
+  echo ""
+  echo "=================================================================="
+  echo "DEPRECATION WARNING: full-network pull"
+  echo "=================================================================="
+  echo "Pulling every subsite in one migration is deprecated — prefer:"
+  echo "  ddev run-migration $BRANCH --subsites=<market,market,...>"
+  echo "  ddev run-migration $BRANCH --base-only"
+  echo "This run continues as a full-network pull (with the new URL rewrites)."
+  echo "=================================================================="
+  echo ""
+
+  # Hosts matrix for every derivable remote market (S9 gets the new hosts
+  # handling too); custom-domain markets are skipped with a note.
+  local_base="${LOCAL_ROOT%."$DDEV_TLD"}"
+  mapfile -t host_shorts < <(printf '%s' "$MAP_JSON" | jq -r --arg root "$ROOT_DOMAIN" '
+    .subsites | to_entries[] | select(.key != "1")
+    | (.value | sub("^https?://"; "") | sub("/.*$"; "") | sub(":.*$"; ""))
+    | select(endswith("." + $root))
+    | .[0:length - (($root | length) + 1)]' | sed "s/\$/.${local_base}/")
+  if [ ${#host_shorts[@]} -gt 0 ]; then
+    hosts_matrix_step "$DRY_RUN" "${host_shorts[@]}"
+  fi
+
+  full_media="no-media"
+  if [ "$SKIP_MEDIA" = false ]; then
+    full_media="with-media"
+  fi
+
+  full_cmd=(wp migrate pull "$REMOTE_URL" "$SECRET_KEY" "--url=${DDEV_PRIMARY_URL}")
+  full_cmd+=("--find=$(rewrite_find_list)" "--replace=$(rewrite_replace_list)")
+  if [ "$full_media" = "with-media" ]; then
+    full_cmd+=("--media=all")
+  else
+    full_cmd+=("--exclude-media=*")
+  fi
+
+  BASE_STATUS="pulling"
+  BASE_REASON="full-network pull, deprecated path"
+  if run_wp_migrate "full-network pull" "${full_cmd[@]}" &&
+    verify_pull_finalized "the full-network pull"; then
+    BASE_STATUS="OK"
+  else
+    BASE_STATUS="FAILED"
+  fi
+
+  full_ok=false
+  [ "$BASE_STATUS" = "OK" ] && full_ok=true
+  if [ "$BASE_STATUS" = "OK" ] && [ "$DRY_RUN" != true ]; then
+    post_migration_cleanup
+    if [ "$full_media" = "with-media" ]; then
+      # Stamp only after validation — exit code 0 is not proof the media landed.
+      if validate_pulled_media "yes"; then
+        date '+%Y-%m-%d %H:%M:%S' >"$MEDIA_REFRESH_SENTINEL"
+      else
+        full_ok=false
+        MEDIA_NOTE="media validation: FAILED — sampled files missing locally (see report above)"
+      fi
+    else
+      MEDIA_NOTE="media: not synced — shared Show/Company images may 404/500 until a media pull runs"
+    fi
+  fi
+  print_summary
+  print_restart_instruction
+  [ "$full_ok" = true ] && exit 0 || exit 2
+fi
+
+# --- Base policy ---
+
+if [ "$BASE_ONLY" = true ]; then
+  base_decision="forced: --base-only"
+else
+  base_decision=$(base_policy "$MAP_JSON")
+fi
+BASE_REASON="${base_decision#*: }"
+base_pulls=false
+case "$base_decision" in
+  forced:*) base_pulls=true ;;
+esac
+
+# --- Media decisions ---
+# Subsite media: on unless --skip-media. Network media mirrors the interactive
+# default — included iff the base pulls — overridable by the explicit flags;
+# --skip-media kills both scopes.
+subsite_media="with-media"
+[ "$SKIP_MEDIA" = true ] && subsite_media="no-media"
+
+# The explicit network flags win over --skip-media for their scope.
+network_media="no"
+case "$NETWORK_MEDIA_FLAG" in
+  on) network_media="yes" ;;
+  off) network_media="no" ;;
+  *) [ "$base_pulls" = true ] && [ "$SKIP_MEDIA" = false ] && network_media="yes" ;;
+esac
+
+echo ""
+echo "Plan:"
+echo "  base: ${base_decision}"
+if [ "$SUBSITES_GIVEN" = true ]; then
+  echo "  markets: $(printf '%s ' "${SELECTED_SLUGS[@]}")"
+fi
+echo "  subsite media: ${subsite_media}"
+echo "  network media: ${network_media}"
+
+# Warm run where the base is skipped but --network-media was forced: route the
+# network scope through the sentinel-driven refresh mechanism (S17).
+network_media_via_refresh=false
+if [ "$network_media" = "yes" ] && [ "$base_pulls" = false ]; then
+  network_media_via_refresh=true
+fi
+
+# --- Serial pull loop (base first; base failure stops subsites) ---
+
+trap 'echo ""; echo "Interrupted (Ctrl-C)."; print_summary partial; exit 130' INT
+
+media_validated_pairs=()
+siteurl_check_pairs=()
+
+if [ "$base_pulls" = true ]; then
+  echo ""
+  echo "[base] Pulling base network data (${BASE_REASON})..."
+  base_media_mode="no-media"
+  [ "$network_media" = "yes" ] && base_media_mode="with-media"
+  if run_base_pull "$base_media_mode"; then
+    BASE_STATUS="OK"
+    # Refresh-timestamp stamping happens at wrap-up, after media validation.
+  else
+    BASE_STATUS="FAILED"
+    echo "" >&2
+    echo "Error: the base pull failed — stopping before subsite pulls (completed local" >&2
+    echo "data is untouched; WP Migrate finalizes tables atomically)." >&2
+    print_summary
+    exit 2
+  fi
+elif [ "$network_media_via_refresh" = true ]; then
+  echo ""
+  echo "[base] Base skipped, but --network-media was requested — running the network"
+  echo "media refresh (this re-pulls base tables; see --refresh-network-media)."
+  media_date=""
+  [ -f "$MEDIA_REFRESH_SENTINEL" ] && media_date=$(head -1 "$MEDIA_REFRESH_SENTINEL" | tr -d '\n')
+  refresh_ok=false
+  if [ -n "$media_date" ]; then
+    if run_base_pull "since-date" "$media_date"; then refresh_ok=true; fi
+  else
+    if run_base_pull "with-media"; then refresh_ok=true; fi
+  fi
+  if [ "$refresh_ok" = true ]; then
+    BASE_STATUS="OK"
+    BASE_REASON="network media refresh"
+    # Refresh-timestamp stamping happens at wrap-up, after media validation.
+  else
+    BASE_STATUS="FAILED"
+    BASE_REASON="network media refresh"
+    PARTIAL=true
+  fi
+fi
+
+if [ "$SUBSITES_GIVEN" = true ]; then
+  total=${#SELECTED_IDS[@]}
+  for i in "${!SELECTED_IDS[@]}"; do
+    id="${SELECTED_IDS[$i]}"
+    slug="${SELECTED_SLUGS[$i]}"
+    echo ""
+    echo "=================================================="
+    echo "[$((i + 1))/${total}] ${slug} (blog ${id})"
+    echo "=================================================="
+
+    if run_subsite_pull "$id" "$slug" "$subsite_media"; then
+      ITEM_NAMES+=("$slug")
+      ITEM_STATUS+=("OK")
+      siteurl_check_pairs+=("${id}:${slug}")
+      if [ "$subsite_media" = "with-media" ]; then
+        media_validated_pairs+=("${id}:${slug}")
+      fi
+      if [ "$DRY_RUN" != true ]; then
+        # Cache-plugin activation state is site-scoped; deactivate per subsite.
+        subsite_url="https://$(host_for_id "$id" | sed "s/\.${REMOTE_ROOT}\$/.${LOCAL_ROOT}/")"
+        for plugin in wp-rocket redis-cache w3-total-cache; do
+          if wp plugin is-active "$plugin" --url="$subsite_url" >/dev/null 2>&1; then
+            echo "  - Deactivating $plugin for $slug"
+            wp plugin deactivate "$plugin" --url="$subsite_url" >/dev/null 2>&1 || true
+          fi
+        done
+      fi
+    else
+      ITEM_NAMES+=("$slug")
+      ITEM_STATUS+=("FAILED")
+      PARTIAL=true
+      echo "" >&2
+      echo "WARNING: pull failed for ${slug} (blog ${id}) — continuing with the remaining markets." >&2
+    fi
+  done
+fi
+
+trap - INT
+
+# --- Wrap-up ---
+
+if [ "$DRY_RUN" = true ]; then
+  echo ""
+  echo "[dry-run] no changes were made."
+  exit 0
+fi
+
+post_migration_cleanup
+
+if [ "$SKIP_MEDIA" = true ] && [ "$network_media" = "no" ]; then
+  MEDIA_NOTE="media: not synced — shared Show/Company images may 404/500 until a media pull runs"
+else
+  network_validated="no"
+  [ "$network_media" = "yes" ] && [ "$BASE_STATUS" = "OK" ] && network_validated="yes"
+  validate_pulled_media "$network_validated" ${media_validated_pairs[@]+"${media_validated_pairs[@]}"} || true
+  # The refresh timestamp is stamped only for a validated network media pull —
+  # WP Migrate's exit code alone is not proof the files landed (item 4).
+  if [ "$network_validated" = "yes" ] && [ "$VALIDATION_FAILED_NETWORK" = false ]; then
+    date '+%Y-%m-%d %H:%M:%S' >"$MEDIA_REFRESH_SENTINEL"
+  fi
+  if [ "$VALIDATION_FAILED_NETWORK" = true ] || [ "$VALIDATION_FAILED_MARKETS" = true ]; then
+    PARTIAL=true
+    MEDIA_NOTE="media validation: FAILED — sampled files missing locally (see report above)"
+  fi
+  if [ "$network_media" = "no" ]; then
+    MEDIA_NOTE="${MEDIA_NOTE:+${MEDIA_NOTE}
+}network media: not refreshed — use 'ddev run-migration $BRANCH --refresh-network-media' to update shared images"
+  fi
+fi
+
+validate_pulled_siteurls ${siteurl_check_pairs[@]+"${siteurl_check_pairs[@]}"} || true
+if [ "$VALIDATION_FAILED_SITEURLS" = true ]; then
+  PARTIAL=true
+  MEDIA_NOTE="${MEDIA_NOTE:+${MEDIA_NOTE}
+}siteurl validation: FAILED — a market still references remote domains (see report above)"
+fi
+
+print_summary
+
+# End-of-run restart instruction — the only channel: nothing prompts or
+# restarts automatically, the developer runs `make restart` themselves.
+print_restart_instruction
+
+for s in ${ITEM_STATUS[@]+"${ITEM_STATUS[@]}"}; do
+  case "$s" in
+    FAILED | UNKNOWN | REJECTED*) PARTIAL=true ;;
+  esac
+done
+[ "$BASE_STATUS" = "FAILED" ] && PARTIAL=true
+
+if [ "$PARTIAL" = true ]; then
+  exit 2
+fi
+exit 0

@@ -9,6 +9,10 @@ is_multisite() {
   grep -q 'WP_ALLOW_MULTISITE.*true' wp-config.php
 }
 
+# Shared migration helpers (append_multisite_constants — grep-guarded so
+# re-runs never duplicate local-config.php constants).
+source "$(dirname "${BASH_SOURCE[0]}")/.migration-utilities"
+
 while getopts "i" option; do
   case "${option}" in
 
@@ -27,9 +31,7 @@ composer update situation/scripts situation/backstage -o >/dev/null 2>&1
 echo "Installing WP Core..."
 if is_multisite; then
   wp core multisite-install --skip-config --url=${DDEV_PRIMARY_URL} --title="${SITE_TITLE}" --admin_user="sit-admin" --admin_email="developers@situationinteractive.com" >/dev/null 2>&1
-  echo "const DOMAIN_CURRENT_SITE = '${DDEV_SITENAME}.${DDEV_TLD}';" >>./local-config.php
-  [ -f wp-content/sunrise.php ] && echo "const SUNRISE = true;" >>./local-config.php
-  [[ "${DDEV_SITENAME}" = "admin.baa" ]] && echo "const COOKIE_DOMAIN = 'baa.test';" >>./local-config.php
+  append_multisite_constants
   cat >.htaccess <<-EOM
 RewriteEngine On
 RewriteBase /

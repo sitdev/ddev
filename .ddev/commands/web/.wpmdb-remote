@@ -1,0 +1,153 @@
+#!/usr/bin/env bash
+
+# Bash wire-protocol client for WP Migrate's connection-verify endpoint.
+# Zero WordPress dependencies (curl + openssl + jq + coreutils) so preflight
+# and --list-subsites work on a fresh clone: no composer, no DB, no plugin.
+#
+# Protocol (mirrors Connection\Local::ajax_verify_connection_to_remote_site):
+#   POST {url}/wp-admin/admin-ajax.php with fields
+#     action=wpmdb_verify_connection_to_remote_site, intent=pull,
+#     referer=<local host label>, version=<plugin version>,
+#     sig=base64(HMAC-SHA1(action.intent.referer.version, secret))
+#   Fields are concatenated in ksort() order for signing (Helper::create_signature).
+#   Success body is scrambled: 'WPMDB-SCRAMBLED' + rot13 with '/' -> %#047%
+#   and '\' -> %#092% (Scramble::scramble). Error bodies are plain
+#   wp_send_json_error JSON: {"success":false,"data":"<message>"}.
+
+WPMDB_LAST_ERROR_FILE="${TMPDIR:-/tmp}/wpmdb-last-remote-error.txt"
+
+# Strip the scramble: prefix off, slash tokens back, then ROT13. Token and
+# slash characters contain no letters, so ordering vs ROT13 is safe.
+wpmdb_unscramble() {
+  sed -e 's/^WPMDB-SCRAMBLED//' -e 's|%#047%|/|g' -e 's|%#092%|\\|g' |
+    tr 'A-Za-z' 'N-ZA-Mn-za-m'
+}
+
+# wpmdb_signature <secret> <action> <intent> <referer> <version>
+# Field order is the ksort() of the field names.
+wpmdb_signature() {
+  local secret="$1"
+  printf '%s' "$2$3$4$5" |
+    openssl dgst -sha1 -hmac "$secret" -binary |
+    openssl base64 -A
+}
+
+# Version of the locally installed plugin, when its files exist.
+wpmdb_local_plugin_version() {
+  local f="wp-content/plugins/wp-migrate-db-pro/wp-migrate-db-pro.php"
+  [ -f "$f" ] || return 1
+  local v
+  v=$(sed -n -E 's/^[[:space:]*]*Version:[[:space:]]*([0-9][0-9a-zA-Z.-]*).*/\1/p' "$f" | head -1)
+  [ -n "$v" ] || return 1
+  printf '%s\n' "$v"
+}
+
+# wpmdb_verify_remote <url> <secret> <version>
+# Prints the unscrambled network-map JSON on stdout.
+# Returns 0 on success; 2 when the remote replied with a WP Migrate error
+# (message saved to $WPMDB_LAST_ERROR_FILE); 1 on transport/garbage failures.
+wpmdb_verify_remote() {
+  local url="$1" secret="$2" version="$3"
+  local action="wpmdb_verify_connection_to_remote_site" intent="pull"
+  local referer="${DDEV_PRIMARY_URL:-local}"
+  referer="${referer#*://}"
+  referer="${referer%/}"
+  local endpoint="${url%/}/wp-admin/admin-ajax.php"
+  local sig body http_code body_file
+
+  : >"$WPMDB_LAST_ERROR_FILE"
+  sig=$(wpmdb_signature "$secret" "$action" "$intent" "$referer" "$version")
+
+  body_file=$(mktemp)
+  # Never echo the assembled request — it carries the connection secret.
+  # Explicit --max-time: never inherit the plugin's long defaults.
+  if ! http_code=$(curl -s -o "$body_file" -w '%{http_code}' \
+    --connect-timeout 8 --max-time 20 \
+    -H "Referer: ${url}" \
+    --data-urlencode "action=${action}" \
+    --data-urlencode "intent=${intent}" \
+    --data-urlencode "referer=${referer}" \
+    --data-urlencode "version=${version}" \
+    --data-urlencode "sig=${sig}" \
+    "$endpoint"); then
+    rm -f "$body_file"
+    echo "Error: no response from ${endpoint} (network error or timeout after 20s)." >&2
+    echo "The admin origins are IP-restricted — is your VPN connected?" >&2
+    return 1
+  fi
+
+  body=$(cat "$body_file")
+  rm -f "$body_file"
+
+  if [ "$http_code" != "200" ]; then
+    echo "Error: remote returned HTTP ${http_code} from ${endpoint} — not a WP Migrate verify response." >&2
+    return 1
+  fi
+
+  case "$body" in
+  WPMDB-SCRAMBLED*)
+    local json
+    json=$(printf '%s' "$body" | wpmdb_unscramble)
+    if ! printf '%s' "$json" | jq -e 'has("tables")' >/dev/null 2>&1; then
+      echo "Error: remote did not return WP Migrate verify JSON (unscrambled payload is invalid)." >&2
+      return 1
+    fi
+    printf '%s\n' "$json"
+    return 0
+    ;;
+  esac
+
+  # Plain (unscrambled) 200 body: a JSON error envelope, or garbage from a
+  # WAF block page / maintenance page / PHP fatal.
+  if printf '%s' "$body" | jq -e 'has("tables")' >/dev/null 2>&1; then
+    printf '%s\n' "$body"
+    return 0
+  fi
+
+  if printf '%s' "$body" | jq -e . >/dev/null 2>&1; then
+    local msg
+    msg=$(printf '%s' "$body" | jq -r '.data // .body // .msg // "unknown remote error"' | sed -e 's/<[^>]*>//g')
+    printf '%s\n' "$msg" >"$WPMDB_LAST_ERROR_FILE"
+    echo "Error: remote WP Migrate reported: ${msg}" >&2
+    return 2
+  fi
+
+  echo "Error: remote did not return WP Migrate verify JSON (unexpected payload — WAF, maintenance page, or fatal?)." >&2
+  return 1
+}
+
+# wpmdb_fetch_network_map <url> <secret>
+# Resolves the plugin version to send (local plugin file when present; else a
+# probe request whose version-mismatch error reveals the remote's version),
+# then performs the verify call.
+wpmdb_fetch_network_map() {
+  local url="$1" secret="$2" version out rc remote_version
+
+  if version=$(wpmdb_local_plugin_version); then
+    wpmdb_verify_remote "$url" "$secret" "$version"
+    return $?
+  fi
+
+  # Fresh clone: no plugin files. The remote requires an exact version match,
+  # so probe with a post-2.0 placeholder and read the real version out of the
+  # mismatch message, then retry once.
+  if out=$(wpmdb_verify_remote "$url" "$secret" "2.0" 2>/dev/null); then
+    printf '%s\n' "$out"
+    return 0
+  fi
+  rc=$?
+
+  remote_version=""
+  if [ "$rc" -eq 2 ] && [ -s "$WPMDB_LAST_ERROR_FILE" ]; then
+    remote_version=$(grep -oE 'version [0-9]+[0-9a-zA-Z.-]*' "$WPMDB_LAST_ERROR_FILE" | head -1 | cut -d' ' -f2)
+  fi
+
+  if [ -z "$remote_version" ]; then
+    echo "Error: could not determine the WP Migrate version to send (local plugin files" >&2
+    echo "are absent and the remote's reply did not reveal its version)." >&2
+    echo "Run 'composer install' (or 'make install') and retry." >&2
+    return 1
+  fi
+
+  wpmdb_verify_remote "$url" "$secret" "$remote_version"
+}
