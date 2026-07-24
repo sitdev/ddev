@@ -1,0 +1,587 @@
+#!/usr/bin/env bash
+
+# Shared helpers for the migration tooling (`migration`, `run-migration`).
+# Sourced, not executed. Deliberately separate from `.utilities`, which runs
+# nvm/node side effects on source.
+
+: "${CONNECTIONS_FILE:=.conf/migrations/connections.json}"
+
+MIGRATION_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$MIGRATION_LIB_DIR/.wpmdb-remote"
+source "$MIGRATION_LIB_DIR/.hosts-utilities"
+
+# ---------------------------------------------------------------------------
+# Topology / state detection
+# ---------------------------------------------------------------------------
+
+# Cold-safe multisite signal: works with zero DB and zero vendor.
+# Single-site projects have no WP_ALLOW_MULTISITE line, so they never match.
+is_wp_multisite() {
+  grep -q 'WP_ALLOW_MULTISITE.*true' wp-config.php 2>/dev/null
+}
+
+# Cold = zero tables in the local DB. WP-independent on purpose: `wp` against
+# an empty DB fails fast but with noisy, ambiguous errors (see
+# docs/discovery/multisite-migration/prototype-findings.md, item 2).
+is_cold_db() {
+  local count
+  count=$(mysql -h db -u db -pdb db -N -e "SHOW TABLES" 2>/dev/null | wc -l)
+  [ "${count:-0}" -eq 0 ]
+}
+
+# ---------------------------------------------------------------------------
+# Output safety
+# ---------------------------------------------------------------------------
+
+# mask_secret <text> <secret> — replace every occurrence of the secret before
+# printing any assembled command or verbose output.
+mask_secret() {
+  local text="$1" secret="$2"
+  if [ -n "$secret" ]; then
+    printf '%s\n' "${text//"$secret"/********}"
+  else
+    printf '%s\n' "$text"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Prompt helpers (gum with plain-terminal fallbacks)
+# ---------------------------------------------------------------------------
+
+has_gum() {
+  command -v gum >/dev/null 2>&1
+}
+
+# The multisite interactive path hard-requires gum multi-select; there is no
+# hand-rolled fallback UI. Non-interactive escape hatch: --subsites=.
+require_gum_multiselect() {
+  if has_gum && gum choose --help 2>&1 | grep -q -- '--no-limit'; then
+    return 0
+  fi
+  echo "Error: selecting markets interactively requires gum with multi-select" >&2
+  echo "support (gum choose --no-limit), which is not available here." >&2
+  echo "Use the non-interactive path instead:" >&2
+  echo "  ddev run-migration <branch> --subsites=<market,market,...>" >&2
+  return 1
+}
+
+# Safe prompt function with fallback. On cancel (Esc), returns empty string
+# without aborting under `set -e`.
+prompt_input() {
+  local prompt_text="$1"
+  local placeholder="${2:-}"
+  local result=""
+
+  if has_gum; then
+    local gum_args=(--prompt "$prompt_text ")
+    if [ -n "$placeholder" ]; then
+      gum_args+=(--placeholder "$placeholder")
+    fi
+    if result=$(gum input "${gum_args[@]}"); then
+      # User submitted; apply placeholder as default when empty
+      if [ -z "$result" ] && [ -n "$placeholder" ]; then
+        result="$placeholder"
+      fi
+    else
+      # User cancelled — leave result empty so callers can detect it
+      result=""
+    fi
+  else
+    read -p "$prompt_text " result
+    if [ -z "$result" ] && [ -n "$placeholder" ]; then
+      result="$placeholder"
+    fi
+  fi
+
+  echo "$result"
+}
+
+# Safe confirm function with fallback
+prompt_confirm() {
+  local prompt_text="$1"
+
+  if has_gum; then
+    gum confirm "$prompt_text"
+  else
+    read -p "$prompt_text (y/N) " -n 1 -r
+    echo
+    [[ $REPLY =~ ^[Yy]$ ]]
+  fi
+}
+
+# Safe choose function with fallback. On cancel (Esc), prints nothing and
+# returns success so callers can treat empty output as "back / cancelled"
+# without tripping `set -e`.
+prompt_choose() {
+  local prompt_text="$1"
+  shift
+  local options=("$@")
+
+  if has_gum; then
+    gum choose --header "$prompt_text" "${options[@]}" || true
+  else
+    echo "$prompt_text" >&2
+    local i=1
+    for opt in "${options[@]}"; do
+      echo "$i) $opt" >&2
+      ((i++))
+    done
+    read -p "Enter choice (1-${#options[@]}): " choice
+    if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#options[@]}" ]; then
+      echo "${options[$((choice-1))]}"
+    fi
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Domain derivation
+# ---------------------------------------------------------------------------
+
+# derive_root_domain <host-a> <host-b> — longest common dot-suffix of two
+# hostnames (admin.baabeta.com + boston.baabeta.com -> baabeta.com). Empty
+# output when the hosts share no suffix.
+derive_root_domain() {
+  local a="${1%%:*}" b="${2%%:*}" suffix=""
+  local -a pa pb
+  IFS=. read -ra pa <<<"$a"
+  IFS=. read -ra pb <<<"$b"
+  local i=$((${#pa[@]} - 1)) j=$((${#pb[@]} - 1))
+  while ((i >= 0 && j >= 0)) && [ "${pa[i]}" = "${pb[j]}" ]; do
+    suffix="${pa[i]}${suffix:+.$suffix}"
+    ((i--)) || true
+    ((j--)) || true
+  done
+  printf '%s\n' "$suffix"
+}
+
+# ---------------------------------------------------------------------------
+# Connection config
+# ---------------------------------------------------------------------------
+
+# load_connection <branch> — populate CONN_* globals from connections.json.
+# root_domain may be absent (derived later); dashed_admin_paths defaults to
+# false and is never inferred from the remote.
+load_connection() {
+  local branch="$1"
+  CONN_URL=$(jq -r ".\"$branch\".url" "$CONNECTIONS_FILE")
+  CONN_SECRET=$(jq -r ".\"$branch\".secret" "$CONNECTIONS_FILE")
+  CONN_LABEL=$(jq -r ".\"$branch\".label // \"$branch\"" "$CONNECTIONS_FILE")
+  CONN_ROOT_DOMAIN=$(jq -r ".\"$branch\".root_domain // empty" "$CONNECTIONS_FILE")
+  CONN_DASHED_ADMIN=$(jq -r ".\"$branch\".dashed_admin_paths // false" "$CONNECTIONS_FILE")
+  CONN_REPLACEMENTS=$(jq -c ".\"$branch\".replacements // []" "$CONNECTIONS_FILE")
+}
+
+# resolve_root_domain <topology_json> — set ROOT_DOMAIN / ROOT_DOMAIN_SOURCE
+# from config, else the longest common dot-suffix of the remote main-site host
+# and the connection host (with a one-time pin-it notice).
+resolve_root_domain() {
+  local map_json="$1"
+  if [ -n "${CONN_ROOT_DOMAIN:-}" ]; then
+    ROOT_DOMAIN="$CONN_ROOT_DOMAIN"
+    ROOT_DOMAIN_SOURCE="explicit"
+    return 0
+  fi
+
+  local remote_main_host conn_host
+  remote_main_host=$(printf '%s' "$map_json" | jq -r '.url // empty')
+  remote_main_host="${remote_main_host#*://}"
+  remote_main_host="${remote_main_host%%/*}"
+  remote_main_host="${remote_main_host%%:*}"
+  conn_host="${CONN_URL#*://}"
+  conn_host="${conn_host%%/*}"
+  conn_host="${conn_host%%:*}"
+
+  ROOT_DOMAIN=$(derive_root_domain "$remote_main_host" "$conn_host")
+  ROOT_DOMAIN_SOURCE="derived"
+
+  if [ -z "$ROOT_DOMAIN" ]; then
+    echo "Error: could not derive a root domain — the remote main site ('$remote_main_host')" >&2
+    echo "and the connection host ('$conn_host') share no domain suffix." >&2
+    echo "Add \"root_domain\" to this connection in $CONNECTIONS_FILE." >&2
+    return 1
+  fi
+
+  echo "Note: root_domain is not set for this connection; derived '${ROOT_DOMAIN}' from the remote."
+  echo "      Pin it in ${CONNECTIONS_FILE} (\"root_domain\": \"${ROOT_DOMAIN}\") to make this explicit."
+}
+
+# derive_roots — compute REMOTE_ROOT / LOCAL_ROOT / ADMIN_PREFIX from
+# ROOT_DOMAIN and the DDEV site name. The local root always derives from
+# SITE_NAME + project_tld (maintainer-authored config), never connections.json.
+derive_roots() {
+  REMOTE_ROOT="$ROOT_DOMAIN"
+
+  local conn_host="${CONN_URL#*://}"
+  conn_host="${conn_host%%/*}"
+  conn_host="${conn_host%%:*}"
+
+  ADMIN_PREFIX=""
+  if [ "$conn_host" != "$REMOTE_ROOT" ] && [[ "$conn_host" == *".$REMOTE_ROOT" ]]; then
+    ADMIN_PREFIX="${conn_host%"$REMOTE_ROOT"}" # e.g. "admin."
+  elif [[ "$conn_host" == *.*.* ]]; then
+    # The admin host need not live under root_domain: on BAA production the
+    # markets share broadway.com while admin lives on broadwayacrossamerica.com.
+    # Fall back to the connection host's first label as the prefix candidate;
+    # the strip below still only applies when the DDEV site name matches it.
+    ADMIN_PREFIX="${conn_host%%.*}."
+  fi
+
+  local local_base="${DDEV_SITENAME}"
+  if [ -n "$ADMIN_PREFIX" ] && [[ "$local_base" == "$ADMIN_PREFIX"* ]]; then
+    local_base="${local_base#"$ADMIN_PREFIX"}"
+  fi
+  LOCAL_ROOT="${local_base}.${DDEV_TLD}"
+}
+
+# ---------------------------------------------------------------------------
+# Rewrite pairs
+# ---------------------------------------------------------------------------
+
+# build_rewrite_pairs <topology_json> — fill REWRITE_FIND/REWRITE_REPLACE/
+# REWRITE_SOURCE in the binding order: //root, .root, dashed root (only when
+# dashed_admin_paths=true), then per-connection replacements in array order.
+# Subdirectory installs collapse to a single root swap with dashed forced off.
+# First-listed pair wins on overlap (WPMDB applies pairs sequentially).
+build_rewrite_pairs() {
+  local map_json="$1"
+  REWRITE_FIND=()
+  REWRITE_REPLACE=()
+  REWRITE_SOURCE=()
+
+  # "Subdomain" here means "markets live on subdomains of the root", which is
+  # what the rewrites must cover. WP's is_subdomain_install() only reflects
+  # the SUBDOMAIN_INSTALL constant — sunrise-mapped multisites (BAA) leave it
+  # false even though every market is a subdomain, and trusting it live
+  # collapsed the pairs to a single root swap (which would import sit_blogs
+  # with un-rewritten remote domains). Judge by the observable subsites map;
+  # the remote's install flag is only the fallback when the map has no signal.
+  local is_subdomain
+  is_subdomain=$(printf '%s' "$map_json" | jq -r --arg root "$ROOT_DOMAIN" '
+    if ([.subsites // {} | to_entries[] | select(.key != "1")
+         | (.value | sub("^https?://"; "") | sub("/.*$"; "") | sub(":.*$"; ""))
+         | select(endswith("." + $root))] | length) > 0
+    then "true"
+    else (.site_details.is_subdomain_install // "true")
+    end')
+
+  if [ "$is_subdomain" = "true" ]; then
+    REWRITE_FIND+=("//${REMOTE_ROOT}")
+    REWRITE_REPLACE+=("//${LOCAL_ROOT}")
+    REWRITE_SOURCE+=("derived")
+
+    REWRITE_FIND+=(".${REMOTE_ROOT}")
+    REWRITE_REPLACE+=(".${LOCAL_ROOT}")
+    REWRITE_SOURCE+=("derived")
+
+    if [ "$CONN_DASHED_ADMIN" = "true" ]; then
+      REWRITE_FIND+=("-${REMOTE_ROOT//./-}")
+      REWRITE_REPLACE+=("-${LOCAL_ROOT//./-}")
+      REWRITE_SOURCE+=("derived")
+    fi
+  else
+    REWRITE_FIND+=("//${REMOTE_ROOT}")
+    REWRITE_REPLACE+=("//${LOCAL_ROOT}")
+    REWRITE_SOURCE+=("derived")
+  fi
+
+  local n i f r
+  n=$(printf '%s' "$CONN_REPLACEMENTS" | jq 'length')
+  for ((i = 0; i < n; i++)); do
+    f=$(printf '%s' "$CONN_REPLACEMENTS" | jq -r ".[$i].find // empty")
+    r=$(printf '%s' "$CONN_REPLACEMENTS" | jq -r ".[$i].replace // empty")
+    [ -n "$f" ] || continue
+    REWRITE_FIND+=("$f")
+    REWRITE_REPLACE+=("$r")
+    REWRITE_SOURCE+=("explicit")
+  done
+
+  # WPMDB's --find/--replace are comma-separated lists with no escape syntax.
+  local v
+  for v in "${REWRITE_FIND[@]}" "${REWRITE_REPLACE[@]}"; do
+    if [[ "$v" == *,* ]]; then
+      echo "Error: rewrite value '$v' contains a comma, which WP Migrate's --find/--replace lists cannot carry." >&2
+      return 1
+    fi
+  done
+}
+
+rewrite_find_list() {
+  local IFS=,
+  printf '%s' "${REWRITE_FIND[*]}"
+}
+
+rewrite_replace_list() {
+  local IFS=,
+  printf '%s' "${REWRITE_REPLACE[*]}"
+}
+
+# ---------------------------------------------------------------------------
+# Table scoping (always from the remote map, never local SHOW TABLES)
+# ---------------------------------------------------------------------------
+
+# WP Migrate / MST working tables sometimes survive on the remote (legacy
+# {prefix}wpsdb_alter_statements stores, MST {prefix}{id}_wpmdbglobal_*
+# staging copies, orphaned _mig_ temp tables). They are not site data and can
+# carry collations the local server lacks (a MySQL-8-created alter table with
+# utf8mb4_0900_ai_ci fails outright on MariaDB) — never include them.
+WPMDB_JUNK_FILTER='def junk: test("wpmdbglobal_")
+    or test("(wpsdb|wpmdb)_alter_statements$")
+    or startswith("_mig_");'
+
+# Base = every remote prefixed table NOT matching ^{prefix}[0-9]+_ — one
+# atomic set (multisite-global + global + blog-1 tables are inseparable at
+# the name level). Comma-joined for --include-tables.
+build_base_tables() {
+  printf '%s' "$1" | jq -r "$WPMDB_JUNK_FILTER"'
+    .prefix as $p
+    | [.prefixed_tables[]
+       | select(junk | not)
+       | select((.[($p | length):] | test("^[0-9]+_")) | not)]
+    | join(",")'
+}
+
+# build_subsite_tables <topology_json> <blog_id> — every remote table matching
+# ^{prefix}{blog_id}_ , comma-joined.
+build_subsite_tables() {
+  printf '%s' "$1" | jq -r --arg id "$2" "$WPMDB_JUNK_FILTER"'
+    .prefix as $p
+    | [.prefixed_tables[]
+       | select(junk | not)
+       | select(.[($p | length):] | test("^" + $id + "_"))]
+    | join(",")'
+}
+
+# ---------------------------------------------------------------------------
+# Pull-finalize verification
+# ---------------------------------------------------------------------------
+# WP Migrate stages every pull into _mig_-prefixed temp tables and swaps them
+# in atomically at finalize — but its CLI can exit 0 even when the migration
+# aborts before the swap (observed live: a media-stage cURL failure). The
+# leftover staging tables are the only reliable failure signal.
+
+# One staging-table name per line: _mig_ temp tables plus MST's
+# {prefix}{id}_wpmdbglobal_* working copies (littered even on success).
+list_staging_leftovers() {
+  mysql -h db -u db -pdb db -N -e "SHOW TABLES" 2>/dev/null |
+    grep -E '^_mig_|wpmdbglobal_' || true
+}
+
+drop_staging_leftovers() {
+  local t
+  while IFS= read -r t; do
+    [ -n "$t" ] || continue
+    mysql -h db -u db -pdb db -e "DROP TABLE IF EXISTS \`${t}\`" 2>/dev/null || true
+  done <<<"$(list_staging_leftovers)"
+}
+
+# verify_pull_finalized <label> — call after a wp migrate pull that exited 0.
+# Returns 1 (after dropping the orphans) when staged _mig_ data tables remain,
+# i.e. the atomic swap never ran and the "success" was a lie. The plugin's own
+# working tables (_mig_queue_jobs/_mig_queue_failures/_mig_wpmdb_alter_statements)
+# and MST wpmdbglobal_ litter can survive even a successful run — those are
+# dropped silently without failing the pull.
+verify_pull_finalized() {
+  [ "${DRY_RUN:-false}" = true ] && return 0
+  local label="$1" leftovers mig
+  leftovers=$(list_staging_leftovers)
+  [ -z "$leftovers" ] && return 0
+  mig=$(printf '%s\n' "$leftovers" | grep '^_mig_' |
+    grep -cvE '^_mig_(queue_jobs|queue_failures|wpmdb_alter_statements)$' || true)
+  drop_staging_leftovers
+  if [ "$mig" -gt 0 ]; then
+    echo "" >&2
+    echo "Error: ${label} ended without the atomic table swap — WP Migrate exited as if" >&2
+    echo "it succeeded but left ${mig} staged _mig_ tables (its exit code does not reflect" >&2
+    echo "mid-migration failures; the real error is in the output above). Local data is" >&2
+    echo "unchanged (the swap is all-or-nothing); the orphaned staging tables have been" >&2
+    echo "dropped." >&2
+    return 1
+  fi
+  return 0
+}
+
+# ---------------------------------------------------------------------------
+# Base pull policy
+# ---------------------------------------------------------------------------
+
+# base_policy <topology_json> — echo "forced: <reason>" or "skipped: <reason>".
+# Warm never means roster-current: remote roster growth forces a re-pull.
+base_policy() {
+  local map_json="$1"
+
+  if [ "${FORCE_BASE:-false}" = true ]; then
+    echo "forced: --force-base"
+    return 0
+  fi
+  if is_cold_db; then
+    echo "forced: cold database"
+    return 0
+  fi
+
+  local prefix have
+  prefix=$(printf '%s' "$map_json" | jq -r '.prefix')
+  have=$(mysql -h db -u db -pdb db -N \
+    -e "SHOW TABLES LIKE '${prefix}sitemeta'; SHOW TABLES LIKE '${prefix}options';" 2>/dev/null | wc -l)
+  if [ "${have:-0}" -lt 2 ]; then
+    echo "forced: base tables missing locally"
+    return 0
+  fi
+
+  local missing
+  missing=$(comm -23 \
+    <(printf '%s' "$map_json" | jq -r '.subsites | keys[]' | sort) \
+    <(wp site list --field=blog_id --url="${DDEV_PRIMARY_URL}" 2>/dev/null | sort))
+  if [ -n "$missing" ]; then
+    echo "forced: remote roster grew (new blog IDs: $(printf '%s' "$missing" | tr '\n' ' ' | sed 's/ *$//'))"
+    return 0
+  fi
+
+  echo "skipped: local roster covers the remote and base tables exist"
+}
+
+# ---------------------------------------------------------------------------
+# Bootstrap (idempotent — N5: repair-only on a half-bootstrapped DB)
+# ---------------------------------------------------------------------------
+
+# append_multisite_constants — grep-guarded so re-runs never duplicate
+# (mirrors local-init's multisite branch, made idempotent).
+append_multisite_constants() {
+  [ -f ./local-config.php ] || return 1
+  if ! grep -q "DOMAIN_CURRENT_SITE" ./local-config.php; then
+    echo "const DOMAIN_CURRENT_SITE = '${DDEV_SITENAME}.${DDEV_TLD}';" >>./local-config.php
+  fi
+  if [ -f wp-content/sunrise.php ] && ! grep -q "const SUNRISE" ./local-config.php; then
+    echo "const SUNRISE = true;" >>./local-config.php
+  fi
+  if [[ "${DDEV_SITENAME}" = "admin.baa" ]] && ! grep -q "COOKIE_DOMAIN" ./local-config.php; then
+    echo "const COOKIE_DOMAIN = 'baa.test';" >>./local-config.php
+  fi
+}
+
+# run_bootstrap — the idempotent cold-start chain (S2/S6): composer install →
+# local-config.php → multisite-install (cold only, never against a populated
+# DB) → guarded constants → network-activate. Loudly logged; failures name
+# the failed prerequisite.
+run_bootstrap() {
+  echo ""
+  echo "=================================================="
+  echo "Bootstrapping local WordPress (multisite)"
+  echo "=================================================="
+
+  if [ ! -f wp-content/vendor/autoload.php ]; then
+    echo "[bootstrap] Installing composer dependencies..."
+    if ! composer install --no-interaction; then
+      echo "Error: bootstrap failed at: composer install." >&2
+      return 1
+    fi
+  else
+    echo "[bootstrap] Composer dependencies present — skipping install."
+  fi
+
+  if [ ! -f ./local-config.php ]; then
+    echo "[bootstrap] Writing baseline local-config.php..."
+    cat >./local-config.php <<-EOT
+	<?php
+	const DB_NAME = 'db';
+	const DB_USER = 'db';
+	const DB_PASSWORD = 'db';
+	const DB_HOST = 'db';
+	const ENVIRONMENT = 'local';
+	const FORCE_HTTPS = true;
+
+	EOT
+  else
+    echo "[bootstrap] local-config.php present — keeping."
+  fi
+
+  if is_cold_db; then
+    echo "[bootstrap] Installing WP multisite core tables (wp core multisite-install)..."
+    if ! wp core multisite-install --skip-config --url="${DDEV_PRIMARY_URL}" \
+      --title="${SITE_TITLE:-${DDEV_SITENAME}}" --admin_user="sit-admin" \
+      --admin_email="developers@situationinteractive.com"; then
+      echo "Error: bootstrap failed at: wp core multisite-install." >&2
+      return 1
+    fi
+  else
+    echo "[bootstrap] Database already has tables — multisite-install skipped (repair mode)."
+  fi
+
+  echo "[bootstrap] Ensuring multisite constants in local-config.php..."
+  if ! append_multisite_constants; then
+    echo "Error: bootstrap failed at: local-config.php constants (file missing)." >&2
+    return 1
+  fi
+
+  if [ ! -f .htaccess ]; then
+    echo "[bootstrap] Writing multisite .htaccess..."
+    cat >.htaccess <<-EOM
+	RewriteEngine On
+	RewriteBase /
+	RewriteRule ^index\.php$ - [L]
+	RewriteRule ^([_0-9a-zA-Z-]+/)?wp-admin$ \$1wp-admin/ [R=301,L]
+	RewriteCond %{REQUEST_FILENAME} -f [OR]
+	RewriteCond %{REQUEST_FILENAME} -d
+	RewriteRule ^ - [L]
+	RewriteRule ^([_0-9a-zA-Z-]+/)?(wp-(content|admin|includes).*) wp/\$2 [L]
+	RewriteRule ^([_0-9a-zA-Z-]+/)?(.*\.php)$ wp/\$2 [L]
+	RewriteRule . index.php [L]
+	EOM
+  fi
+
+  echo "[bootstrap] Network-activating required plugins..."
+  if ! wp plugin activate backstage advanced-custom-fields-pro wp-migrate-db-pro \
+    --url="${DDEV_PRIMARY_URL}" --network; then
+    echo "Error: bootstrap failed at: plugin network activation." >&2
+    return 1
+  fi
+
+  echo "[bootstrap] Done."
+}
+
+# ---------------------------------------------------------------------------
+# Remote topology fetch
+# ---------------------------------------------------------------------------
+
+# fetch_topology <url> <secret> — print the remote network-map JSON (the WP
+# Migrate connection-verify payload) on stdout. Warm, bootstrapped sites use
+# the in-process plugin command so plugin-version/license/allow_pull failures
+# surface as the plugin's own errors; otherwise the zero-dependency bash wire
+# client is used. Any failure is a hard error — callers must never fall
+# through to single-site treatment.
+fetch_topology() {
+  local url="$1" secret="$2" out
+  local plugin_main="wp-content/plugins/wp-migrate-db-pro/wp-migrate-db-pro.php"
+
+  # Test escape hatch: serve the map from a fixture file instead of the
+  # network (offline engine tests / CI).
+  if [ -n "${WPMDB_TOPOLOGY_FIXTURE:-}" ] && [ -f "$WPMDB_TOPOLOGY_FIXTURE" ]; then
+    cat "$WPMDB_TOPOLOGY_FIXTURE"
+    return 0
+  fi
+
+  # `wp plugin is-active` without --network fails for network-activated
+  # plugins (status active-network), so match the status string instead.
+  local plugin_status=""
+  if ! is_cold_db && [ -f "$plugin_main" ]; then
+    plugin_status=$(wp plugin list --name=wp-migrate-db-pro --field=status \
+      --url="${DDEV_PRIMARY_URL}" 2>/dev/null || true)
+  fi
+
+  if [ "$plugin_status" = "active" ] || [ "$plugin_status" = "active-network" ]; then
+    if ! out=$(wp --require="$MIGRATION_LIB_DIR/.mdb-network-map.php" \
+      mdb-network-map "$url" "$secret" --url="${DDEV_PRIMARY_URL}"); then
+      echo "Error: could not fetch the remote site map from ${url}." >&2
+      echo "If that was a timeout: the admin origins are IP-restricted — is your VPN connected?" >&2
+      return 1
+    fi
+  else
+    out=$(wpmdb_fetch_network_map "$url" "$secret") || return 1
+  fi
+
+  if ! printf '%s' "$out" | jq -e 'has("tables")' >/dev/null 2>&1; then
+    echo "Error: the remote site map response is not valid WP Migrate verify JSON." >&2
+    return 1
+  fi
+
+  printf '%s\n' "$out"
+}
