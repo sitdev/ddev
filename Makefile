@@ -3,20 +3,6 @@
 
 UPDATE_BRANCH="arm"
 
-# Per-project overrides (branch keys, media profiles, ...). This Makefile is
-# replaced from sitdev/ddev on self-update; project-specific values must live
-# in the include, which the platform never touches.
--include .conf/make.env
-
-# Connection keys in connections.json for each environment (override per
-# project in .conf/make.env).
-STAGING_BRANCH ?= develop
-PRODUCTION_BRANCH ?= master
-# Deployment-profile names for the pull-media rsync fast path (a separate
-# namespace from connection keys when they diverge).
-STAGING_MEDIA_PROFILE ?= $(STAGING_BRANCH)
-PRODUCTION_MEDIA_PROFILE ?= $(PRODUCTION_BRANCH)
-
 # Long pulls die if the machine idles into sleep and drops the VPN; hold an
 # idle-sleep assertion for their duration where caffeinate exists (macOS).
 ifeq ($(shell command -v caffeinate >/dev/null 2>&1 && echo yes),yes)
@@ -128,24 +114,24 @@ migration: ## Start Migration dialog to create new or run existing migrations
 
 pull-staging: ## Pull staging environment using WP Migrate Pro (MIGRATION_ARGS="--subsites=a,b ...")
 	@if [ -n "$(MIGRATION_ARGS)" ]; then \
-		$(KEEPAWAKE) ddev run-migration $(STAGING_BRANCH) $(MIGRATION_ARGS); \
-	elif $(KEEPAWAKE) ddev pull-media $(STAGING_MEDIA_PROFILE) 2>/dev/null; then \
+		$(KEEPAWAKE) ddev run-migration develop $(MIGRATION_ARGS); \
+	elif $(KEEPAWAKE) ddev pull-media develop 2>/dev/null; then \
 		echo "✓ Media synced via rsync"; \
-		$(KEEPAWAKE) ddev run-migration $(STAGING_BRANCH) --skip-media; \
+		$(KEEPAWAKE) ddev run-migration develop --skip-media; \
 	else \
 		echo "✗ Rsync failed, will sync media via WP Migrate Pro"; \
-		$(KEEPAWAKE) ddev run-migration $(STAGING_BRANCH); \
+		$(KEEPAWAKE) ddev run-migration develop; \
 	fi
 
 pull-production: ## Pull production environment using WP Migrate Pro (MIGRATION_ARGS="--subsites=a,b ...")
 	@if [ -n "$(MIGRATION_ARGS)" ]; then \
-		$(KEEPAWAKE) ddev run-migration $(PRODUCTION_BRANCH) $(MIGRATION_ARGS); \
-	elif $(KEEPAWAKE) ddev pull-media $(PRODUCTION_MEDIA_PROFILE) 2>/dev/null; then \
+		$(KEEPAWAKE) ddev run-migration master $(MIGRATION_ARGS); \
+	elif $(KEEPAWAKE) ddev pull-media master 2>/dev/null; then \
 		echo "✓ Media synced via rsync"; \
-		$(KEEPAWAKE) ddev run-migration $(PRODUCTION_BRANCH) --skip-media; \
+		$(KEEPAWAKE) ddev run-migration master --skip-media; \
 	else \
 		echo "✗ Rsync failed, will sync media via WP Migrate Pro"; \
-		$(KEEPAWAKE) ddev run-migration $(PRODUCTION_BRANCH); \
+		$(KEEPAWAKE) ddev run-migration master; \
 	fi
 
 test: 
