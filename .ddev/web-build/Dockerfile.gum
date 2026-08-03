@@ -1,7 +1,13 @@
 #ddev-generated
 # Install Gum (Charm TUI toolkit) for interactive CLI menus
+#
+# apt-get update is allowed to fail: the ddev-webserver base image ships the
+# packages.sury.org/php repo, whose signing key is currently expired
+# (EXPKEYSIG B188E2B695BD4743). That makes `apt-get update` exit non-zero even
+# though the charm.sh lists fetch fine, which aborts this whole layer and makes
+# `ddev start` fail to build. DDEV's own injected layers use the same pattern.
 RUN mkdir -p /etc/apt/keyrings && \
     curl -fsSL https://repo.charm.sh/apt/gpg.key | gpg --dearmor -o /etc/apt/keyrings/charm.gpg && \
     echo "deb [signed-by=/etc/apt/keyrings/charm.gpg] https://repo.charm.sh/apt/ * *" | tee /etc/apt/sources.list.d/charm.list && \
-    apt-get update && \
+    (apt-get update || true) && \
     apt-get install -y gum
