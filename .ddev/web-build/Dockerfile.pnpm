@@ -1,2 +1,12 @@
 #ddev-generated
-RUN npm install --global pnpm
+# Pin pnpm to the 10.x line.
+#
+# An unpinned `npm install --global pnpm` resolves to whatever is newest at build
+# time, which now means pnpm 11. That requires Node.js >= 22.13 and dies at import
+# with ERR_UNKNOWN_BUILTIN_MODULE on `node:sqlite`, so every pnpm command breaks on
+# projects running Node 20 (nodejs_version in config.yaml). pnpm 10 supports
+# Node >= 18.12, which covers every Node version in use here.
+#
+# Projects needing an exact version (to match "packageManager" in package.json)
+# can override this file via .conf/.ddev/web-build/Dockerfile.pnpm.
+RUN npm install --global pnpm@10
