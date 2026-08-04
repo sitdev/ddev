@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+## Description: Install the shared org.env config layer above the webroot
+
+# Fetches config/org.env from workflow-support (the same repo pull-media uses)
+# and places it at /var/www/.env, where the wp-env-config walk-up finds it —
+# mirroring the ~/.env drop the deploy pipeline performs on servers. Requires
+# the developer's ssh agent, forwarded into the container by `ddev auth ssh`.
+
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+
+if ! git clone -q --depth 1 git@github.com:sitdev/workflow-support.git "$tmp" 2>/dev/null; then
+  echo "org-env: cannot reach workflow-support (is your ssh agent loaded? try 'ddev auth ssh'); skipping org config layer" >&2
+  exit 0
+fi
+
+if [ ! -f "$tmp/config/org.env" ]; then
+  echo "org-env: workflow-support has no config/org.env; skipping" >&2
+  exit 0
+fi
+
+sudo install -m 600 -o "$(id -un)" -g "$(id -gn)" "$tmp/config/org.env" /var/www/.env

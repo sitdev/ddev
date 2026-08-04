@@ -46,16 +46,12 @@ if (file_exists(__DIR__ . '/wp-content/vendor/autoload.php')) {
     require_once __DIR__ . '/wp-content/vendor/autoload.php';
 }
 
-// ===================================================
-// Load database info and local development parameters
-// ===================================================
-if (file_exists(__DIR__ . '/local-tests-config.php')) {
-    include(__DIR__ . '/local-tests-config.php');
-}
-
-// ===================================================
-// Initialize Situation defaults
-// ===================================================
-if (class_exists('\Situation\WPConfig')) {
-    new \Situation\WPConfig(__DIR__);
-}
+// ============================================================
+// Environment configuration cascade (sitchco/wp-env-config).
+// Tests use local-tests-config.php as the site config and skip
+// shared .env discovery so runs stay hermetic; server env vars
+// still fill missing DB constants for CI containers.
+// ============================================================
+define( 'WP_ENVIRONMENT_TYPE', 'local' );
+define( 'WP_CACHE', true );
+\Sitchco\Config\EnvLoader::load(__DIR__, [], 'local-tests-config.php');

@@ -42,7 +42,7 @@ start: ## Turn on ddev
 
 	@if ! make running 2>/dev/null; then \
 		make self-update; \
-		ddev start && ddev auth ssh && ddev composer-auth && make status; \
+		ddev start && ddev auth ssh && ddev composer-auth && ddev org-env && make status; \
 		ddev post-start; \
 	fi
 	

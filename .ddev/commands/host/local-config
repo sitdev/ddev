@@ -8,7 +8,28 @@ const DB_NAME = 'db';
 const DB_USER = 'db';
 const DB_PASSWORD = 'db';
 const DB_HOST = 'db';
+const WP_ENVIRONMENT_TYPE = 'local';
+const WP_HOME = '${DDEV_PRIMARY_URL}/';
+// Legacy constant kept so branches still on Situation\WPConfig keep working
 const ENVIRONMENT = 'local';
 const FORCE_HTTPS = true;
+
+// Org policy flags (the shared org.env layer, installed by ddev org-env,
+// also provides these; DISALLOW_FILE_MODS must stay server-only, so the
+// site layer overrides it here)
+const AUTOMATIC_UPDATER_DISABLED = true;
+const WP_DISABLE_FATAL_ERROR_HANDLER = true;
+const GFORM_DISABLE_AUTO_UPDATE = true;
+const DISALLOW_FILE_MODS = false;
+
+// WordPress auth keys and salts - generated per local environment
+const AUTH_KEY = '$(openssl rand -hex 32)';
+const SECURE_AUTH_KEY = '$(openssl rand -hex 32)';
+const LOGGED_IN_KEY = '$(openssl rand -hex 32)';
+const NONCE_KEY = '$(openssl rand -hex 32)';
+const AUTH_SALT = '$(openssl rand -hex 32)';
+const SECURE_AUTH_SALT = '$(openssl rand -hex 32)';
+const LOGGED_IN_SALT = '$(openssl rand -hex 32)';
+const NONCE_SALT = '$(openssl rand -hex 32)';
 
 EOT
