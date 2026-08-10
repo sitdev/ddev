@@ -46,78 +46,9 @@ check_connections_tracked() {
   done
 }
 
-# Check if gum is available, fallback to basic prompts
-has_gum() {
-  command -v gum >/dev/null 2>&1
-}
-
-# Safe prompt function with fallback. On cancel (Esc), returns empty string
-# without aborting under `set -e`.
-prompt_input() {
-  local prompt_text="$1"
-  local placeholder="${2:-}"
-  local result=""
-
-  if has_gum; then
-    local gum_args=(--prompt "$prompt_text ")
-    if [ -n "$placeholder" ]; then
-      gum_args+=(--placeholder "$placeholder")
-    fi
-    if result=$(gum input "${gum_args[@]}"); then
-      # User submitted; apply placeholder as default when empty
-      if [ -z "$result" ] && [ -n "$placeholder" ]; then
-        result="$placeholder"
-      fi
-    else
-      # User cancelled — leave result empty so callers can detect it
-      result=""
-    fi
-  else
-    read -p "$prompt_text " result
-    if [ -z "$result" ] && [ -n "$placeholder" ]; then
-      result="$placeholder"
-    fi
-  fi
-
-  echo "$result"
-}
-
-# Safe confirm function with fallback
-prompt_confirm() {
-  local prompt_text="$1"
-
-  if has_gum; then
-    gum confirm "$prompt_text"
-  else
-    read -p "$prompt_text (y/N) " -n 1 -r
-    echo
-    [[ $REPLY =~ ^[Yy]$ ]]
-  fi
-}
-
-# Safe choose function with fallback. On cancel (Esc), prints nothing and
-# returns success so callers can treat empty output as "back / cancelled"
-# without tripping `set -e`.
-prompt_choose() {
-  local prompt_text="$1"
-  shift
-  local options=("$@")
-
-  if has_gum; then
-    gum choose --header "$prompt_text" "${options[@]}" || true
-  else
-    echo "$prompt_text" >&2
-    local i=1
-    for opt in "${options[@]}"; do
-      echo "$i) $opt" >&2
-      ((i++))
-    done
-    read -p "Enter choice (1-${#options[@]}): " choice
-    if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#options[@]}" ]; then
-      echo "${options[$((choice-1))]}"
-    fi
-  fi
-}
+# Shared helpers: gum prompts (has_gum/prompt_input/prompt_confirm/
+# prompt_choose), multisite detection, topology fetch, bootstrap chain.
+source "$(dirname "${BASH_SOURCE[0]}")/.migration-utilities"
 
 # Parse combined connection string (format: "https://example.com secret-key")
 parse_connection_string() {
@@ -203,8 +134,9 @@ add_connection() {
     --arg lbl "$branch" \
     '{url: ($url), secret: ($secret), label: ($lbl)}')
 
-  # Update connections file
-  jq ".\"$branch\" = $connection_obj" "$CONNECTIONS_FILE" > "${CONNECTIONS_FILE}.tmp"
+  # Merge into any existing entry so hand-edited fields on this key
+  # (replacements, root_domain, dashed_admin_paths, description) survive a re-add.
+  jq ".\"$branch\" = ((.\"$branch\" // {}) + $connection_obj)" "$CONNECTIONS_FILE" > "${CONNECTIONS_FILE}.tmp"
   mv "${CONNECTIONS_FILE}.tmp" "$CONNECTIONS_FILE"
 
   echo ""
@@ -264,6 +196,13 @@ pull_connection() {
   echo "=================================================="
   echo ""
 
+  # Multisite projects get market selection + scoped media prompts; the
+  # single-site flow below is untouched (N1).
+  if is_wp_multisite; then
+    pull_connection_multisite "$branch"
+    return $?
+  fi
+
   # Choose media handling strategy
   echo ""
   echo "Note: For faster media sync via rsync, use 'make pull-staging' or 'make pull-production'"
@@ -304,6 +243,170 @@ pull_connection() {
     read
     return 1
   fi
+}
+
+# Multisite pull flow (decision 1A): market multi-select with the base pull
+# handled by the auto policy and narrated in the header; media prompts are
+# scoped per 3B. Dispatches to run-migration with --subsites=<blog ids>.
+pull_connection_multisite() {
+  local branch="$1"
+
+  # Hard-require gum multi-select — no hand-rolled fallback UI (S4).
+  require_gum_multiselect || exit 1
+
+  load_connection "$branch"
+
+  # Topology fetch under a spinner; stderr is preserved so fetch errors reach
+  # the user verbatim. Any failure is a hard error — never a fall-through to
+  # the single-site flow (constraint 15).
+  local map_json fetch_err
+  fetch_err=$(mktemp)
+  if ! map_json=$(WPMDB_URL="$CONN_URL" WPMDB_SECRET="$CONN_SECRET" \
+    gum spin --spinner dot --title "Fetching remote site map from ${CONN_URL}..." --show-output -- \
+    bash -c 'source .ddev/commands/web/.migration-utilities && fetch_topology "$WPMDB_URL" "$WPMDB_SECRET"' \
+    2>"$fetch_err"); then
+    cat "$fetch_err" >&2
+    rm -f "$fetch_err"
+    echo ""
+    echo "✗ Could not fetch the remote site map — aborting this pull."
+    exit 1
+  fi
+  rm -f "$fetch_err"
+
+  if [ "$(printf '%s' "$map_json" | jq -r '.site_details.is_multisite // "false"')" != "true" ]; then
+    echo "✗ This project is multisite but the remote is not — refusing to pull." >&2
+    exit 1
+  fi
+
+  resolve_root_domain "$map_json" || exit 1
+
+  # Market list: "slug (blog N)"; custom-domain markets are annotated (S13 —
+  # they hard-fail at dispatch until covered by explicit replacements).
+  local -a options=()
+  mapfile -t options < <(printf '%s' "$map_json" | jq -r --arg root "$ROOT_DOMAIN" '
+    .subsites | to_entries[] | select(.key != "1")
+    | .key as $id
+    | (.value | sub("^https?://"; "") | sub("/.*$"; "")) as $host
+    | ($host
+       | if $root != "" and endswith("." + $root)
+         then .[0:length - (($root | length) + 1)]
+         else "\(.) [custom domain]" end) as $slug
+    | "\($slug) (blog \($id))"' | sort)
+
+  if [ ${#options[@]} -eq 0 ]; then
+    echo "✗ The remote network map lists no subsites." >&2
+    exit 1
+  fi
+
+  echo ""
+  # gum multi-select submits only SPACE/X-toggled rows — ENTER alone on a
+  # highlighted row can return nothing (and ESC always does). Re-prompt once
+  # with the keys spelled out instead of silently bouncing to the menu.
+  local selected attempt
+  for attempt in 1 2; do
+    selected=$(gum choose --no-limit --height=15 \
+      --header "Select markets to pull (SPACE/X toggles, ENTER confirms) — base network data is always included" \
+      "${options[@]}") || true
+    [ -n "$selected" ] && break
+    if [ "$attempt" = 1 ]; then
+      echo ""
+      echo "Nothing was toggled — select at least one market with SPACE (or X), then press ENTER."
+      echo ""
+    fi
+  done
+  if [ -z "$selected" ]; then
+    echo "No markets selected — returning to the menu."
+    return
+  fi
+
+  local ids
+  ids=$(printf '%s\n' "$selected" | sed -E 's/.*\(blog ([0-9]+)\)$/\1/' | paste -sd, -)
+
+  # Base decision drives which media questions appear (3B).
+  local base_decision
+  base_decision=$(base_policy "$map_json")
+
+  local -a media_flags=()
+  echo ""
+  if [[ "$base_decision" == forced:* ]]; then
+    echo "Base network data will be pulled (${base_decision#forced: })."
+    if ! prompt_confirm "Include media for pulled markets?"; then
+      media_flags+=(--skip-media)
+    fi
+    if prompt_confirm "Include network media (blog 1)? Shared Show/Company images live there — a first pull is ~14.5k originals plus generated files and can take hours (run it off-hours)."; then
+      media_flags+=(--network-media)
+    else
+      media_flags+=(--skip-network-media)
+    fi
+  else
+    echo "Base network data is up to date — it will be skipped (${base_decision#skipped: })."
+    if ! prompt_confirm "Include media for pulled markets?"; then
+      media_flags+=(--skip-media)
+    fi
+    echo ""
+    echo "ℹ Network media (shared Show/Company images) is not refreshed on this run —"
+    echo "  use the 'Refresh network media' menu item to update shared images."
+  fi
+
+  echo ""
+  local rc=0
+  if bash .ddev/commands/web/run-migration "$branch" "--subsites=${ids}" \
+    ${media_flags[@]+"${media_flags[@]}"}; then
+    rc=0
+  else
+    rc=$?
+  fi
+
+  if [ "$rc" -eq 0 ]; then
+    echo ""
+    echo "✓ Migration completed. Exiting..."
+    exit 0
+  elif [ "$rc" -eq 2 ]; then
+    echo ""
+    echo "⚠ Migration completed with warnings — review the summary above."
+    exit 2
+  else
+    echo ""
+    echo "✗ Migration failed."
+    echo ""
+    echo "Press Enter to return to menu..."
+    read
+    return 1
+  fi
+}
+
+# Refresh network media (S17): standalone blog-1-scoped operation.
+refresh_network_media_menu() {
+  ensure_connections_file
+
+  if [ "$(jq 'length' "$CONNECTIONS_FILE")" -eq 0 ]; then
+    echo ""
+    echo "No connections configured yet."
+    return
+  fi
+
+  mapfile -t labels < <(jq -r 'to_entries[] | "\(.key): \(.value.label // .key)"' "$CONNECTIONS_FILE")
+  local selected
+  selected=$(prompt_choose "Refresh network media from:" "${labels[@]}")
+  if [ -z "$selected" ]; then
+    return
+  fi
+  local branch
+  branch=$(echo "$selected" | cut -d: -f1)
+
+  local rc=0
+  if bash .ddev/commands/web/run-migration "$branch" --refresh-network-media; then
+    rc=0
+  else
+    rc=$?
+  fi
+  echo ""
+  if [ "$rc" -eq 0 ]; then
+    echo "✓ Network media refreshed."
+  else
+    echo "✗ Network media refresh reported problems (see summary above)."
+  fi
+  read -p "Press Enter to continue..."
 }
 
 # Push to a connection
@@ -400,6 +503,22 @@ ensure_migrate_plugin_ready() {
 # selection instead of two; push stays nested under a submenu.
 main_menu() {
   ensure_connections_file
+
+  # Cold multisite start (S2): the WP_ALLOW_MULTISITE grep and table-count
+  # probe are DB/vendor-independent, so this runs before any wp call.
+  if is_wp_multisite && is_cold_db; then
+    echo ""
+    echo "=================================================="
+    echo "Project not initialized locally"
+    echo "=================================================="
+    if prompt_confirm "Project not initialized locally — run local-init now?"; then
+      run_bootstrap || exit 1
+    else
+      echo "Cannot run migrations against an empty database. Run 'make local-init' first."
+      exit 1
+    fi
+  fi
+
   ensure_migrate_plugin_ready
 
   while true; do
@@ -423,6 +542,11 @@ main_menu() {
     if [ "$non_prod_count" -gt 0 ]; then
       menu+=("Push to remote ›")
       actions+=("push"$'\t')
+    fi
+
+    if is_wp_multisite; then
+      menu+=("Refresh network media")
+      actions+=("refresh"$'\t')
     fi
 
     menu+=("Add connection")
@@ -453,6 +577,7 @@ main_menu() {
     case "$cmd" in
       pull) pull_connection "$branch" ;;
       push) push_connection ;;
+      refresh) refresh_network_media_menu ;;
       add)  add_connection ;;
       list) list_connections; read -p "Press Enter to continue..." ;;
       exit) echo ""; echo "Goodbye!"; exit 0 ;;

@@ -5,4 +5,12 @@
 ## Example: "ddev wp core version" or "ddev wp plugin install user-switching --activate"
 ## ExecRaw: true
 
-wp "$@" --url=${DDEV_PRIMARY_URL}
+for arg in "$@"; do
+    case "$arg" in
+        --url|--url=*)
+            exec wp "$@"
+            ;;
+    esac
+done
+
+exec wp "$@" --url="${DDEV_PRIMARY_URL}"

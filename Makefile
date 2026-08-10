@@ -2,6 +2,19 @@
 # Version: 0.1.0
 
 UPDATE_BRANCH="sitchco"
+
+# Long pulls die if the machine idles into sleep and drops the VPN; hold an
+# idle-sleep assertion for their duration where caffeinate exists (macOS).
+ifeq ($(shell command -v caffeinate >/dev/null 2>&1 && echo yes),yes)
+KEEPAWAKE = caffeinate -i
+else
+KEEPAWAKE =
+endif
+
+# Extra arguments passed through verbatim to `ddev run-migration` by the pull
+# targets, e.g. make pull-staging MIGRATION_ARGS="--subsites=boston,miami --skip-media".
+# When set, the rsync media fast path is skipped — run-migration owns media.
+MIGRATION_ARGS ?=
 .PHONY: *
 
 all: start install build container-sync
@@ -45,7 +58,7 @@ start: ## Turn on ddev
 		ddev start && ddev auth ssh && ddev composer-auth && ddev org-env && make status; \
 		ddev post-start; \
 	fi
-	
+
 stop: ## Shut down ddev
 	-@ddev stop
 
@@ -90,7 +103,7 @@ update-review: ## Full reset and update process with manual comparison against a
 	@ddev update-review
 
 self-update: ## Update Situation ddev config from remote repository. Branch is defined by $UPDATE_BRANCH.
-	@[ -z ${UPDATE_BRANCH} ] || /bin/bash -c "$$(curl -fsSL https://raw.githubusercontent.com/sitdev/ddev/main/install.sh)" -- "${UPDATE_BRANCH}" 
+	@[ -z ${UPDATE_BRANCH} ] || /bin/bash -c "$$(curl -fsSL https://raw.githubusercontent.com/sitdev/ddev/main/install.sh)" -- "${UPDATE_BRANCH}"
 
 node20-upgrade:
 	@/bin/bash -c "$$(curl -fsSL https://raw.githubusercontent.com/sitdev/ddev/main/bin/node20-upgrade.sh)"
@@ -100,27 +113,31 @@ local-init: start ## Initialize local WP database using basic defaults
 	@ddev local-config
 	@make container-sync
 	@ddev local-init
-	@ddev migration
+	@$(KEEPAWAKE) ddev migration
 
 migration: ## Start Migration dialog to create new or run existing migrations
-	@ddev migration
+	@$(KEEPAWAKE) ddev migration
 
-pull-staging: ## Pull staging environment using WP Migrate Pro
-	@if ddev pull-media develop 2>/dev/null; then \
+pull-staging: ## Pull staging environment using WP Migrate Pro (MIGRATION_ARGS="--subsites=a,b ...")
+	@if [ -n "$(MIGRATION_ARGS)" ]; then \
+		$(KEEPAWAKE) ddev run-migration develop $(MIGRATION_ARGS); \
+	elif $(KEEPAWAKE) ddev pull-media develop 2>/dev/null; then \
 		echo "✓ Media synced via rsync"; \
-		ddev run-migration develop --skip-media; \
+		$(KEEPAWAKE) ddev run-migration develop --skip-media; \
 	else \
 		echo "✗ Rsync failed, will sync media via WP Migrate Pro"; \
-		ddev run-migration develop; \
+		$(KEEPAWAKE) ddev run-migration develop; \
 	fi
 
-pull-production: ## Pull production environment using WP Migrate Pro
-	@if ddev pull-media master 2>/dev/null; then \
+pull-production: ## Pull production environment using WP Migrate Pro (MIGRATION_ARGS="--subsites=a,b ...")
+	@if [ -n "$(MIGRATION_ARGS)" ]; then \
+		$(KEEPAWAKE) ddev run-migration master $(MIGRATION_ARGS); \
+	elif $(KEEPAWAKE) ddev pull-media master 2>/dev/null; then \
 		echo "✓ Media synced via rsync"; \
-		ddev run-migration master --skip-media; \
+		$(KEEPAWAKE) ddev run-migration master --skip-media; \
 	else \
 		echo "✗ Rsync failed, will sync media via WP Migrate Pro"; \
-		ddev run-migration master; \
+		$(KEEPAWAKE) ddev run-migration master; \
 	fi
 
 test: 
