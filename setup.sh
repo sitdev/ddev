@@ -12,11 +12,29 @@ source "${script_root}/bin/updates.sh"
 source "${script_root}/bin/check-dependencies.sh"
 source "${script_root}/bin/create-settings.sh"
 
+# The project root is the webroot on our sites, so .conf/ answers to HTTP.
+# Deny it at the server level: it holds migration connection secrets and may
+# hold locally provided credentials. Rewritten every run — .htaccess is
+# gitignored, so it never travels with the repo.
+mkdir -p .conf
+cat <<'EOT' >.conf/.htaccess
+# Deny all web access to project configuration.
+<IfModule mod_authz_core.c>
+  Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+  Order allow,deny
+  Deny from all
+</IfModule>
+EOT
+
 if [ -d .git ]; then
   # Ensure .gitignore ends with a newline before appending
   [ -f .gitignore ] && [ -n "$(tail -c1 .gitignore)" ] && echo '' >>.gitignore
   grep -q ".ddev" .gitignore || echo '/.ddev' >>.gitignore
   grep -q "llms.txt" .gitignore || echo '/llms.txt' >>.gitignore
+  grep -q "conf/org.env" .gitignore || echo '/.conf/org.env' >>.gitignore
+  grep -q "conf/auth.json" .gitignore || echo '/.conf/auth.json' >>.gitignore
 
   if [ ! -f .git/hooks/post-checkout ]; then
     mkdir -p .git/hooks

@@ -1,23 +1,72 @@
 #!/usr/bin/env bash
 
-## Description: Install the shared org.env config layer above the webroot
+## Description: Install the shared org config layer above the webroot
+## Usage: org-env [--quiet]
+## Flags: [{"Name":"quiet","Usage":"Suppress the guidance message when no source is available"}]
 
-# Fetches config/org.env from workflow-support (the same repo pull-media uses)
-# and places it at /var/www/.env, where the wp-env-config walk-up finds it —
-# mirroring the ~/.env drop the deploy pipeline performs on servers. Requires
-# the developer's ssh agent, forwarded into the container by `ddev auth ssh`.
+# Installs the shared org config layer at /var/www/.env, where the
+# wp-env-config walk-up finds it — mirroring the ~/.env drop the deploy
+# pipeline performs on servers. Sources are tried most-specific first:
+#
+#   1. .conf/org.env         per-project override
+#   2. ~/.sitchco/org.env    per-machine drop via ~/.ddev/homeadditions
+#   3. sitdev/workflow-support   Situation org members; needs `ddev auth ssh`
+#
+# A file that is present always wins over the clone, so an organization
+# running its own license keys never needs Situation org access at all. The
+# tradeoff is that a provided file is authoritative and never refreshes —
+# `ddev secrets-check` reports which source won.
 
+set -u
+
+DEST=/var/www/.env
+PROJECT_SRC="${DDEV_APPROOT:-/var/www/html}/.conf/org.env"
+GLOBAL_SRC="${HOME}/.sitchco/org.env"
+
+quiet=
+[ "${1:-}" = "--quiet" ] && quiet=1
+
+install_layer() {
+  sudo install -m 600 -o "$(id -un)" -g "$(id -gn)" "$1" "$DEST"
+}
+
+if [ -f "$PROJECT_SRC" ]; then
+  install_layer "$PROJECT_SRC"
+  exit 0
+fi
+
+if [ -f "$GLOBAL_SRC" ]; then
+  install_layer "$GLOBAL_SRC"
+  exit 0
+fi
+
+# Nothing provided locally — fall through to the org clone.
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
-if ! git clone -q --depth 1 git@github.com:sitdev/workflow-support.git "$tmp" 2>/dev/null; then
-  echo "org-env: cannot reach workflow-support (is your ssh agent loaded? try 'ddev auth ssh'); skipping org config layer" >&2
+if git clone -q --depth 1 git@github.com:sitdev/workflow-support.git "$tmp" 2>/dev/null &&
+  [ -f "$tmp/config/org.env" ]; then
+  install_layer "$tmp/config/org.env"
   exit 0
 fi
 
-if [ ! -f "$tmp/config/org.env" ]; then
-  echo "org-env: workflow-support has no config/org.env; skipping" >&2
-  exit 0
-fi
+# The post-start hook runs on every start, including before the first
+# `ddev auth ssh`, so it passes --quiet rather than nagging each time.
+[ -n "$quiet" ] && exit 0
 
-sudo install -m 600 -o "$(id -un)" -g "$(id -gn)" "$tmp/config/org.env" /var/www/.env
+cat >&2 <<EOM
+
+org-env: no shared org config layer available. The site will run without org
+license keys (ACF Pro, Gravity Forms, WP Migrate, Postmark).
+
+  Situation developers: load your ssh agent, then 'ddev auth ssh && ddev org-env'.
+
+  Everyone else: obtain org.env through secure delivery and place it at
+
+    ~/.ddev/homeadditions/.sitchco/org.env   all projects on this machine
+    <project>/.conf/org.env                  this project only
+
+  then run 'ddev org-env'. See 'ddev secrets-check'.
+
+EOM
+exit 0

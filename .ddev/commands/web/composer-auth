@@ -1,7 +1,62 @@
 #!/usr/bin/env bash
-{
-  git clone git@github.com:situationinteractive/satis.git ~/satis
-  mkdir -p ~/.composer
-  cp ~/satis/auth.json ~/.composer/
-  rm -rf ~/satis
-} >/dev/null 2>&1
+
+## Description: Install Composer credentials for the private package repository
+## Usage: composer-auth [--quiet]
+## Flags: [{"Name":"quiet","Usage":"Suppress the guidance message when no source is available"}]
+
+# Places auth.json at ~/.composer/auth.json. Sources, most specific first:
+#
+#   1. .conf/auth.json           per-project override
+#   2. ~/.composer/auth.json     already in place — this is where a
+#                                ~/.ddev/homeadditions drop lands, and ddev
+#                                re-copies homeadditions on every start
+#   3. situationinteractive/satis    Situation org members; needs `ddev auth ssh`
+
+set -u
+
+DEST="${HOME}/.composer/auth.json"
+PROJECT_SRC="${DDEV_APPROOT:-/var/www/html}/.conf/auth.json"
+
+quiet=
+[ "${1:-}" = "--quiet" ] && quiet=1
+
+mkdir -p "${HOME}/.composer"
+
+if [ -f "$PROJECT_SRC" ]; then
+  install -m 600 "$PROJECT_SRC" "$DEST"
+  exit 0
+fi
+
+# The homeadditions drop lands directly on the destination, so a file already
+# sitting here is the answer — never clobber it with a clone.
+[ -f "$DEST" ] && exit 0
+
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+
+if git clone -q --depth 1 git@github.com:situationinteractive/satis.git "$tmp" 2>/dev/null &&
+  [ -f "$tmp/auth.json" ]; then
+  install -m 600 "$tmp/auth.json" "$DEST"
+  exit 0
+fi
+
+# The post-start hook runs on every start, including before the first
+# `ddev auth ssh`, so it passes --quiet rather than nagging each time.
+[ -n "$quiet" ] && exit 0
+
+cat >&2 <<EOM
+
+composer-auth: no Composer credentials available. 'composer install' will fail
+on private packages.
+
+  Situation developers: load your ssh agent, then 'ddev auth ssh && ddev composer-auth'.
+
+  Everyone else: obtain auth.json through secure delivery and place it at
+
+    ~/.ddev/homeadditions/.composer/auth.json   all projects on this machine
+    <project>/.conf/auth.json                   this project only
+
+  then run 'ddev composer-auth'. See 'ddev secrets-check'.
+
+EOM
+exit 0

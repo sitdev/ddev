@@ -6,7 +6,17 @@ This project uses DDEV and Make to standardize the local development environment
 
 1. **Clone the repository.**
 2. **Ensure you have the required tools installed** (see Requirements section below).
-3. **Run the main development command:**
+3. **Place your credentials.** This project needs an `org.env` and an `auth.json`
+   to install private packages and license the plugins it depends on. If you are
+   outside the organization that owns this site, you will be given both files
+   directly; place them at:
+   ```
+   ~/.ddev/homeadditions/.sitchco/org.env
+   ~/.ddev/homeadditions/.composer/auth.json
+   ```
+   This is a one-time placement per machine. Developers inside the organization
+   can skip this — `make dev` fetches both automatically.
+4. **Run the main development command:**
    ```shell
    make dev
    ```
@@ -45,3 +55,7 @@ The Makefile provides several commands to streamline your workflow. Here are the
 | `make lint`       | Analyzes source code for style issues and potential errors without making changes.                                  |
 | `make local-init` | Creates the local-config.php file and initializes the WP database with basic defaults on first run.                 |
 | `make xdebug`     | Toggles Xdebug status (off by default).                                                                             |
+
+If the build fails on private packages or the site is missing plugin licenses,
+run `ddev secrets-check` — it reports which credential source is in use and
+what is missing.

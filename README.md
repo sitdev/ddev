@@ -36,6 +36,15 @@ If your project does not have a Makefile yet, run the following inside your proj
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/sitdev/ddev/main/install.sh)"
 ```
 
+### Credentials
+
+Projects need an `org.env` and an `auth.json` to pull private packages and
+license the plugins they depend on. Situation developers get both automatically
+via `ddev auth ssh`. Developers outside the organization are given the files
+directly — see [Local credentials](docs/credentials.md) for where to place them.
+
+Run `ddev secrets-check` at any time to see what is in use and what is missing.
+
 ## More Documentation
 
 [https://ddev.readthedocs.io/en/stable/](https://ddev.readthedocs.io/en/stable/)

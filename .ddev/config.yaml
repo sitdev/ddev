@@ -21,6 +21,13 @@ nodejs_version: "20"
 hooks:
   post-start:
     - exec: ~/bin/startup
+    # /var/www/.env and ~/.composer/auth.json are container-local and do not
+    # survive the container being recreated, which `ddev restart` does. Since
+    # `make start` skips its credential pass when the project is already
+    # running, this hook is the only thing that restores them after a restart.
+    # --quiet because on a first cold start the ssh agent is not authed yet.
+    - exec: /mnt/ddev_config/commands/web/composer-auth --quiet
+    - exec: /mnt/ddev_config/commands/web/org-env --quiet
 
 
 # Key features of ddev's config.yaml:

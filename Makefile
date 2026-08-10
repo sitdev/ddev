@@ -55,7 +55,12 @@ start: ## Turn on ddev
 
 	@if ! make running 2>/dev/null; then \
 		make self-update; \
-		ddev start && ddev auth ssh && ddev composer-auth && ddev org-env && make status; \
+		ddev start || exit 1; \
+		ddev auth ssh || echo "ssh agent unavailable; using locally provided credentials" >&2; \
+		ddev composer-auth; \
+		ddev org-env; \
+		make status; \
+		ddev secrets-check; \
 		ddev post-start; \
 	fi
 
