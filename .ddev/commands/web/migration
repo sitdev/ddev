@@ -450,8 +450,36 @@ push_connection() {
   # Extract branch from selection
   branch=$(echo "$selected" | cut -d: -f1)
 
+  # WP Migrate only transfers media when --media is passed; leaving it off
+  # pushes the database alone.
   echo ""
-  if ! prompt_confirm "⚠️  This will OVERWRITE the '$branch' remote database. Continue?"; then
+  local -a media_flags=()
+  local what="database"
+  local warning="This will OVERWRITE the '$branch' remote database."
+  media_strategy=$(prompt_choose "How should media be handled?" \
+    "Include media (synced via WP Migrate Pro)" \
+    "Skip media (database only)" \
+    "← Back to main menu")
+
+  case "$media_strategy" in
+    "Include"*)
+      media_flags+=(--media=all)
+      what="database and media"
+      warning="This will OVERWRITE the '$branch' remote database and copy local media over its uploads."
+      ;;
+    "Skip"*)
+      ;;
+    "←"*|"")
+      return
+      ;;
+    *)
+      echo "Invalid selection"
+      return 1
+      ;;
+  esac
+
+  echo ""
+  if ! prompt_confirm "⚠️  $warning Continue?"; then
     echo "Cancelled. No changes made."
     return
   fi
@@ -462,11 +490,12 @@ push_connection() {
 
   # Execute push
   echo ""
-  echo "Pushing database..."
+  echo "Pushing $what..."
 
-  if wp migrate push "$REMOTE_URL" "$SECRET_KEY" --url=${DDEV_PRIMARY_URL}; then
+  if wp migrate push "$REMOTE_URL" "$SECRET_KEY" --url=${DDEV_PRIMARY_URL} \
+    ${media_flags[@]+"${media_flags[@]}"}; then
     echo ""
-    echo "✓ Database pushed successfully!"
+    echo "✓ Pushed $what successfully!"
     echo ""
     echo "✓ Push completed. Exiting..."
     exit 0
